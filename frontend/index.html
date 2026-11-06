@@ -1176,7 +1176,6 @@ pre.bg-gray-950 code {
                 <button onclick="switchPowerBiView('model')" id="header-tab-model" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">Modeling</button>
                 <button onclick="switchPowerBiView('wargame')" id="header-tab-table" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">Wargame Arena</button>
                 <button onclick="switchPowerBiView('sql')" id="header-tab-sql" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">SQL Console</button>
-                <button onclick="switchPowerBiView('text2sql')" id="header-tab-text2sql" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">AI Copilot</button>
                 <button onclick="switchPowerBiView('fyi')" id="header-tab-fyi" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">FYI Guide</button>
             </div>
 
@@ -1258,7 +1257,7 @@ pre.bg-gray-950 code {
             </div>
 
             <!-- Group 2: Security & Schema Compliance -->
-            <div class="flex items-center space-x-2 pr-4 border-r border-[#d2d0ce]">
+            <div class="flex items-center space-x-2">
                 <button onclick="openPiiScannerModal()" id="btn-pii-scanner" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Scan dataset for unmasked credit cards & PII">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
                     <span>PII Scanner</span>
@@ -1271,10 +1270,6 @@ pre.bg-gray-950 code {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     <span>Import API</span>
                 </button>
-                <button onclick="openSentinelModal()" id="btn-sentinel-monitor" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-indigo-700 font-bold cursor-pointer" title="ARIA-inspired FinTech Sentinel: Time-series drift, tail forecasting & contextual stand-down">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-                    <span>Sentinel (ARIA)</span>
-                </button>
                 <button onclick="openQuantInvestigatorModal()" id="btn-quant-investigator" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-rose-700 font-bold cursor-pointer" title="ARIA-inspired Deep Quant Investigator: Autonomous Python Sandbox RCA">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
                     <span>Investigator (RCA)</span>
@@ -1286,14 +1281,7 @@ pre.bg-gray-950 code {
                 <span class="text-[9px] text-slate-400 uppercase font-bold self-end tracking-wider">Security</span>
             </div>
 
-            <!-- Group 3: Help & Knowledge Manual -->
-            <div class="flex items-center space-x-2">
-                <button onclick="switchPowerBiView('fyi')" id="ribbon-btn-fyi" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-[#107c41] font-bold cursor-pointer" title="Open comprehensive technical architecture manual & schema guide">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    <span>FYI Guide</span>
-                </button>
-                <span class="text-[9px] text-slate-400 uppercase font-bold self-end tracking-wider">Help</span>
-            </div>
+
         </div>
     </header>
 
@@ -6171,14 +6159,14 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 'model': 'header-tab-model',
                 'wargame': 'header-tab-table',
                 'sql': 'header-tab-sql',
-                'text2sql': 'header-tab-text2sql',
                 'fyi': 'header-tab-fyi'
             };
 
+            const activeHeaderKey = (mode === 'text2sql') ? 'data' : mode;
             Object.entries(headerTabs).forEach(([key, tabId]) => {
                 const tab = document.getElementById(tabId);
                 if (tab) {
-                    if (key === mode) {
+                    if (key === activeHeaderKey) {
                         tab.className = "px-3 py-1 font-bold pbi-ribbon-tab-active bg-white rounded-t shadow-2xs cursor-pointer";
                         tab.style.cssText = "color: #107c41 !important; border-bottom: 2px solid #107c41 !important; background-color: #ffffff !important; font-weight: bold !important;";
                     } else {
