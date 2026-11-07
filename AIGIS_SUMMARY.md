@@ -1,80 +1,68 @@
-# 🛡️ AIGIS — Bản Tóm Tắt Dự Án (Mini Hackathon One-Pager)
+# AIGIS — Bản Tóm Tắt Dự Án (One-Pager)
 **AIGIS: Adversarial Intelligence for Generative Immunity & Security**
 
 > [!IMPORTANT]
-> **Định nghĩa Tên gọi Chuẩn xác (Exact Acronym):**
-> $$\mathbf{A} \cdot \mathbf{I} \cdot \mathbf{G} \cdot \mathbf{I} \cdot \mathbf{S}$$
-> * **A** — **A**dversarial *(Tác chiến Đối kháng / Red Teaming)*
-> * **I** — **I**ntelligence for *(Hệ điều phối Đa Agent Thông minh)*
-> * **G** — **G**enerative *(Tự sinh Đòn Tấn công & Tự sinh Bản vá)*
-> * **I** — **I**mmunity & *(Cơ chế Tự sinh Miễn dịch Số / Self-Healing)*
-> * **S** — **S**ecurity *(Bảo vệ Toàn diện Logic Nghiệp vụ FinTech)*
+> **Phạm vi:** AIGIS là **proof-of-concept (bản mô phỏng)**. Mọi đòn tấn công, bản vá và kiểm thử lại đều chạy trên một **mock target trong cùng tiến trình** (`backend/mock_target/store.py`) với dữ liệu giả lập. Hiện chưa thể trỏ AIGIS vào một hệ thống thật. Chi tiết giới hạn xem `README.md` mục *Scope & limitations*.
+
+> **Tên gọi:**
+> * **A** — **A**dversarial *(Tác chiến đối kháng / Red Teaming)*
+> * **I** — **I**ntelligence for *(Điều phối đa agent)*
+> * **G** — **G**enerative *(Sinh kịch bản tấn công & mã vá mẫu)*
+> * **I** — **I**mmunity & *(Vòng lặp vá – kiểm thử lại)*
+> * **S** — **S**ecurity *(Bảo vệ logic nghiệp vụ FinTech)*
 >
 > **Pitch 30 giây:**
-> *"Kẻ gian trong FinTech và TMĐT không cần hack server — họ hack **Logic Nghiệp vụ (Business Logic)**: dùng kỹ thuật đua gói tin để rút tiền gấp 20 lần trong 1 mili-giây, hoặc bóc tách client để tìm endpoint ẩn trục lợi voucher. Các công cụ DAST/SAST thông thường hoàn toàn 'mù' trước lỗi logic này. **AIGIS** (Adversarial Intelligence for Generative Immunity & Security) là nền tảng Đấu trường Đối kháng Tự hành đầu tiên: sử dụng công nghệ dịch ngược **REA** để bóc tách mã nguồn client/API, thả **Hacker AI (Red Team)** vào tự tấn công bòn rút tiền trong Sandbox, và điều phối **Defender AI (Blue Team)** tự sinh mã vá lỗi trước khi tính năng lên Production."*
+> *"Kẻ gian trong FinTech và TMĐT không cần hack server — họ khai thác **logic nghiệp vụ**: gửi nhiều request nhận voucher cùng lúc để nhận nhiều lần (race condition), hoặc tìm endpoint ẩn trong mã client. Công cụ SAST/DAST thông thường khó phát hiện loại lỗi theo thời gian này. **AIGIS** mô phỏng một đấu trường: Red Team AI tấn công một hệ thống mẫu, đo số tiền thất thoát, Blue Team AI đề xuất mã vá, sau đó kiểm thử lại để chứng minh lỗi đã được chặn — và quy đổi rủi ro thành số tiền để lãnh đạo dễ ra quyết định."*
 
 ---
 
-## 1. Cơ Chế Hoạt Động 4 Bước (The Wargame Loop)
+## 1. Vòng lặp 4 bước (The Wargame Loop)
 
 ```mermaid
 flowchart LR
-    A["1. REA Reconstruction<br/>Dò Shadow API & State Graph"] --> B["2. Red Team Cerebrus<br/>HTTP/2 Single-Packet Attack"]
-    B --> C["3. Sandbox Combat<br/>Bắn payload & đo thất thoát ($)"]
-    C --> D["4. Blue Team Aegis<br/>CRS Auto-Patch & 1-Click PR"]
+    A["1. Dò Shadow API<br/>(regex trên client bundle)"] --> B["2. Red Team Cerebrus<br/>Burst N request đồng thời"]
+    B --> C["3. Sandbox (mock target)<br/>Đo thất thoát ($)"]
+    C --> D["4. Blue Team Aegis<br/>Mã vá mẫu + Retest"]
 ```
 
-1. **REA State Reconstruction:** Nạp tài liệu API và mã nguồn Client JS/APK $\rightarrow$ Bộ giải mã REA bóc trần toàn bộ Shadow APIs ẩn và tự động dựng lại Đồ thị Trạng thái giao dịch (Business State Machine Graph).
-2. **Red Team Single-Packet Fuzzer:** Agent *Cerebrus* áp dụng cơ chế đồng bộ gói tin độc quyền, nén 20 requests vào 1 khung TCP HTTP/2 để triệt tiêu hoàn toàn độ trễ mạng, tạo đòn tấn công đua số dư (Race condition) chuẩn xác ở độ phân giải mili-giây.
-3. **Sandbox Combat & Exposure Calc:** Chạy payload tấn công trong môi trường sandbox cô lập, đo lường chính xác số tiền thất thoát thực tế (ví dụ: *"Rút thành công \$7,500 từ 1 tài khoản test do thiếu Idempotency"*).
-4. **Blue Team CRS Auto-Patch:** Agent *Aegis* tự động phân tích cú pháp AST, sinh mã Middleware phòng hộ (Redis Distributed Lock), chạy lại bài test để chứng minh lỗi đã biến mất mà không làm ảnh hưởng trải nghiệm khách hàng thật.
+1. **Dò Shadow API:** Quét file `checkout_bundle.js` bằng regex để tìm endpoint không có trong tài liệu API.
+2. **Red Team burst:** Agent *Cerebrus* chạy N lời gọi đồng thời (`asyncio.gather`) vào mock store để tái hiện race condition. Không gửi HTTP thật.
+3. **Sandbox & đo thất thoát:** Đếm số lần nhận voucher trùng và quy ra số tiền bị chiếm (ví dụ: *15 voucher × $500 = $7,500* trên mock target).
+4. **Blue Team vá & kiểm thử lại:** Agent *Aegis* sinh **mã vá mẫu** (SQL atomic claim, FastAPI, Spring, Gin, WAF). Trên mock target, "áp bản vá" là bật cờ khóa; bài retest chỉ đạt khi **đúng 1** lần nhận thành công. Bài kiểm tra regression đo tỷ lệ chặn nhầm và độ trễ tăng thêm trên chính mock target.
 
 ---
 
-## 2. Đội Hình 5 AI Agents Trong AIGIS
+## 2. Các agent trong AIGIS
 
-| Agent | Tên gọi | Vai trò & Trọng trách chính |
+| Agent | Vai trò | Thực tế trong code |
 | :--- | :--- | :--- |
-| **Agent 1** | **REA Dissector** | Dịch ngược mã client, phát hiện logic kiểm tra sơ hở ở frontend và dựng State Machine Graph. |
-| **Agent 2** | **Red Team "Cerebrus"** | Tự động sinh mã Python khai thác *HTTP/2 Single-Packet Attack* để đua lệnh và vượt rào trạng thái. |
-| **Agent 3** | **Sandbox Runner** | Môi trường cô lập thực thi exploit, đo đếm số dư bị trừ và tính toán **Chỉ số Rủi ro Tài chính (\$ Exposure)**. |
-| **Agent 4** | **Blue Team "Aegis"** | Tự động sinh mã vá (Redis Idempotency / State Token), tái kiểm thử zero-regression (độ trễ chỉ tăng $< 2\text{ms}$). |
-| **Agent 5** | **Arbiter** | Chấm điểm an toàn (Security Score: 0–100), lập Financial Exposure Dossier và xuất **1-Click GitHub Pull Request**. |
+| **REA Dissector** | Tìm Shadow API trong mã client | Regex, không phân tích AST/APK |
+| **Red Team "Cerebrus"** | Tái hiện race condition | Coroutine đồng thời, không có network I/O |
+| **Sandbox Runner** | Chạy kịch bản, tính thất thoát | Mock store trong bộ nhớ |
+| **Blue Team "Aegis"** | Đề xuất mã vá, chạy regression | Mã vá chỉ để hiển thị, không được thực thi |
+| **Arbiter** | Điểm an toàn, báo cáo tài chính, nội dung PR | Điểm là heuristic demo; PR là **mô phỏng** (không gọi GitHub) |
+
+Ngoài ra: **FinTech Sentinel** (theo dõi TPS, lọc flash sale hợp lệ), **Quant Investigator** (RCA bằng SQL chỉ đọc), **Traffic Classifier** (phân loại heuristic, có báo cáo precision/recall trên dữ liệu giả lập).
 
 ---
 
-## 3. Kịch Bản Demo 3 Phút Trên Sân Khấu
+## 3. Kịch bản demo 3 phút
 
-* **⏱️ 0:00 – 0:30 (Mở Đầu):** *"Kẻ gian vừa rút sạch \$200,000 ngân sách khuyến mãi Tết qua lỗi đua lệnh logic mà SonarQube hay Burp Suite đều bó tay. Giới thiệu **AIGIS** (Adversarial Intelligence for Generative Immunity & Security)."*
-* **⏱️ 0:40 – 1:30 (Màn 1: REA & Red Team Tấn Công):**
-  * Tải file `Tet_Voucher_API.json` và `checkout.js` lên giao diện $\rightarrow$ Bấm **`[⚔️ BẮT ĐẦU WARGAME]`**.
-  * Cột trái (Đỏ) bừng sáng: REA tìm thấy hàm gọi API chưa khóa throttle $\rightarrow$ Red Agent tự viết Python bắn 15 request đồng thời trong 1 gói tin TCP.
-  * Sandbox báo động đỏ: *"Khai thác thành công! Chiếm đoạt 15 voucher trị giá \$7,500!"*
-* **⏱️ 1:30 – 2:30 (Màn 2: Blue Team Phản Công & Tự Sinh Bản Vá):**
-  * Cột phải (Xanh) nhảy vào: Blue Agent phân tích nguyên nhân và tự tạo middleware **Redis Distributed Lock (Idempotency Key)**.
-  * Chạy lại đợt tấn công cũ: 14 request sau lập tức bị từ chối với mã `429 Too Many Requests`.
-  * Kiểm tra giao dịch khách thật: Thời gian phản hồi chỉ tăng 1.8ms, không gây phiền hà khách hàng.
-* **⏱️ 2:30 – 3:00 (Màn 3: Báo Cáo Tài Chính & 1-Click GitHub PR):**
-  * Bung thẻ **Financial Exposure Dossier**:
-    * `Nguy cơ thất thoát đã triệt tiêu: $150,000/chiến dịch`.
-    * `Điểm an toàn Logic: 32/100 -> 98/100`.
-  * Bấm nút **[1-Click Create GitHub PR]** $\rightarrow$ Đoạn mã vá lỗi được gửi thẳng lên repo của team Dev.
+* **0:00 – 0:30 (Mở đầu):** Nêu vấn đề lỗi logic nghiệp vụ khiến ngân sách khuyến mãi bị rút. Nói rõ: *"Đây là bản mô phỏng trên hệ thống mẫu."*
+* **0:30 – 1:30 (Red Team):** Bấm **Start Wargame** → REA tìm endpoint ẩn → Cerebrus bắn 15 lời gọi đồng thời → mock target ghi nhận nhiều lần nhận voucher trái phép và số tiền thất thoát.
+* **1:30 – 2:30 (Blue Team):** Aegis hiển thị mã vá mẫu → bật bản vá trên mock target → retest: chỉ 1 request hợp lệ được duyệt, các request trùng bị chặn (`429`) → regression: hiển thị tỷ lệ chặn nhầm và độ trễ tăng thêm **đo được** trên mock.
+* **2:30 – 3:00 (Báo cáo):** Mở **Financial Exposure Dossier**: thất thoát trước/sau vá, điểm an toàn heuristic, nội dung PR mô phỏng. Kết bằng hướng phát triển: trỏ vào API thật, thêm kịch bản gian lận ngân hàng.
 
 ---
 
-## 4. Checklist Triển Khai MVP (24h – 48h)
+## 4. Trạng thái hiện tại
 
-- [ ] **1. Mock Target & Vulnerable Backend (FastAPI):**
-  - Endpoint `/api/v1/voucher/claim` dính lỗi race condition.
-  - File bundle `checkout.js` giả lập có hàm gọi API chưa khai báo trong Swagger.
-- [ ] **2. Tầng REA & Red Team Agent:**
-  - Agent đọc spec + phân tích endpoint bằng công cụ REA.
-  - Red Agent sinh script Python HTTP/2 Single-Packet Attack bắn đồng thời 15-20 requests.
-- [ ] **3. Sandbox Executor:**
-  - Runner chạy script Python, ghi nhận HTTP Status và số dư ví/voucher trong DB test.
-- [ ] **4. Blue Team Agent:**
-  - Prompt sinh mã vá lỗi (middleware FastAPI với Redis lock).
-  - Tự động mount middleware vào instance test và chạy lại test regression.
-- [ ] **5. Giao diện Wargame Split-Screen (React):**
-  - Màn hình chia đôi: Nửa đỏ (Red Team logs & exploit code) - Nửa xanh (Blue Team patch & regression test).
-  - Thẻ kết quả: Financial Exposure Dossier + nút 1-Click PR.
+- [x] Mock target có endpoint `/api/v1/voucher/claim` dính race condition và `checkout_bundle.js` chứa endpoint ẩn.
+- [x] Dò Shadow API (regex) và burst đồng thời trên mock store.
+- [x] Đo thất thoát, retest sau vá, regression check (tỷ lệ chặn nhầm, độ trễ).
+- [x] Mã vá mẫu đa nền tảng (SQL, FastAPI, Spring, Gin, Cloudflare, NGINX, AWS WAF) — không thực thi.
+- [x] Dashboard một trang (`frontend/index.html`), Copilot hỏi đáp, NL-to-SQL, bộ phân loại traffic.
+- [x] API có token, chỉ bind `127.0.0.1`, có bộ test hồi quy bảo mật.
+- [ ] Gửi HTTP đồng thời thật vào một service mục tiêu riêng.
+- [ ] Tạo PR thật qua GitHub API.
+- [ ] Dữ liệu và tỷ lệ gian lận sát thực tế ngân hàng.

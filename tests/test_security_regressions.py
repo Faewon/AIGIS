@@ -149,6 +149,14 @@ class LlmKeyTheftTests(unittest.TestCase):
         eng.configure("groq")
         self.assertEqual(eng.api_key, "")
 
+    def test_stale_model_from_other_provider_uses_default(self):
+        from backend.llm_engine import LLMEngine
+        eng = LLMEngine()
+        eng.configure("groq", api_key="gsk_x", model_name="heuristic-reasoner-v1")
+        self.assertEqual(eng.model_name, "llama-3.3-70b-versatile")
+        eng.configure("groq", api_key="gsk_x", model_name="deepseek-r1-distill-llama-70b")
+        self.assertEqual(eng.model_name, "deepseek-r1-distill-llama-70b")
+
 
 class RetestTests(unittest.TestCase):
     def test_patched_retest_allows_exactly_one(self):
@@ -187,6 +195,29 @@ class ClassifierLabelLeakTests(unittest.TestCase):
         row = {"user_id": "usr_botnet_cerebrus_001", "is_attack": 1, "burst_stream_id": "NONE",
                "is_datacenter_proxy": 0, "user_agent": "Mozilla/5.0", "api_endpoint": "/api/v1/card/verify"}
         self.assertFalse(classify_traffic_row(row)["is_attack"])
+
+
+class ClassifierMetricsTests(unittest.TestCase):
+    def test_confusion_matrix_metrics(self):
+        from backend.traffic_classifier import _evaluation_metrics
+        ev = _evaluation_metrics(tp=8, fp=2, tn=88, fn=2, bursts={"b1": [1000, 1004], "b2": [2000, None]})
+        self.assertEqual(ev["precision_pct"], 80.0)
+        self.assertEqual(ev["recall_pct"], 80.0)
+        self.assertEqual(ev["false_positive_rate_pct"], round(2 / 90 * 100, 2))
+        self.assertEqual(ev["f1_pct"], 80.0)
+        self.assertEqual(ev["time_to_detect"]["median_ms"], 4)
+        self.assertEqual(ev["time_to_detect"]["bursts_missed"], 1)
+
+    def test_no_labels_not_evaluated(self):
+        from backend.traffic_classifier import _evaluation_metrics
+        self.assertEqual(_evaluation_metrics(0, 0, 0, 0, {})["status"], "NOT_EVALUATED")
+
+    def test_no_positive_predictions_has_no_precision(self):
+        from backend.traffic_classifier import _evaluation_metrics
+        ev = _evaluation_metrics(tp=0, fp=0, tn=10, fn=3, bursts={})
+        self.assertIsNone(ev["precision_pct"])
+        self.assertEqual(ev["recall_pct"], 0.0)
+        self.assertIsNone(ev["f1_pct"])
 
 
 class SentinelWindowTests(unittest.TestCase):

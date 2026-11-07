@@ -28,6 +28,17 @@ DEFAULT_BASE_URLS = {
     "gemini": "",
     "heuristic": ""
 }
+DEFAULT_MODELS = {
+    "gemini": "gemini-1.5-flash-latest",
+    "groq": "llama-3.3-70b-versatile",
+    "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
+    "openai": "gpt-4o-mini",
+    "cerebras": "llama-3.3-70b",
+    "sambanova": "Meta-Llama-3.3-70B-Instruct",
+    "github": "gpt-4o-mini",
+    "ollama": "llama3.2",
+    "heuristic": "heuristic-reasoner-v1"
+}
 ALLOWED_HOSTS = {
     "groq": {"api.groq.com"},
     "openrouter": {"openrouter.ai"},
@@ -78,18 +89,7 @@ class LLMEngine:
         self.last_raw_response: str = ""
         self._cached_gemini_models: List[str] = []
 
-        default_models = {
-            "gemini": "gemini-1.5-flash-latest",
-            "groq": "llama-3.3-70b-versatile",
-            "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
-            "openai": "gpt-4o-mini",
-            "cerebras": "llama-3.3-70b",
-            "sambanova": "Meta-Llama-3.3-70B-Instruct",
-            "github": "gpt-4o-mini",
-            "ollama": "llama3.2",
-            "heuristic": "heuristic-reasoner-v1"
-        }
-        self.model_name = default_models.get(self.provider, "heuristic-reasoner-v1")
+        self.model_name = DEFAULT_MODELS[self.provider]
         self.base_url = DEFAULT_BASE_URLS.get(self.provider, "")
 
     def configure(self, provider: str, api_key: str = "", model_name: str = "", base_url: str = ""):
@@ -107,24 +107,21 @@ class LLMEngine:
 
         self.provider = clean_provider
 
+        model_name = (model_name or "").strip()
+        # A model name left over from another provider's default (e.g. the UI still showing
+        # "heuristic-reasoner-v1" after switching to Groq) is treated as "use the default".
+        if model_name and any(model_name == m for p, m in DEFAULT_MODELS.items() if p != clean_provider):
+            model_name = ""
+        if clean_provider == "heuristic":
+            model_name = ""
+
         if model_name:
             if clean_provider == "gemini":
                 self.model_name = normalize_gemini_model_name(model_name)
             else:
-                self.model_name = model_name.strip()
+                self.model_name = model_name
         else:
-            default_models = {
-                "gemini": "gemini-1.5-flash-latest",
-                "groq": "llama-3.3-70b-versatile",
-                "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
-                "openai": "gpt-4o-mini",
-                "cerebras": "llama-3.3-70b",
-                "sambanova": "Meta-Llama-3.3-70B-Instruct",
-                "github": "gpt-4o-mini",
-                "ollama": "llama3.2",
-                "heuristic": "heuristic-reasoner-v1"
-            }
-            self.model_name = default_models.get(clean_provider, "heuristic-reasoner-v1")
+            self.model_name = DEFAULT_MODELS[clean_provider]
 
         # Thiết lập base_url mặc định theo provider
         self.base_url = DEFAULT_BASE_URLS.get(clean_provider, "")

@@ -2626,7 +2626,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     <div class="flex items-center justify-between border-b border-gray-200 pb-1">
                         <div class="flex items-center space-x-2">
                             <span class="font-bold text-gray-900 uppercase">AIGIS Autonomous Traffic Classifier</span>
-                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]" id="classify-accuracy-pill">99.4% ACCURACY</span>
+                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]" id="classify-accuracy-pill">NOT EVALUATED</span>
                         </div>
                         <span class="text-gray-500 text-[10px]" id="classify-time-pill">Processed in 15.6ms</span>
                     </div>
@@ -2634,6 +2634,14 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         <div>Benign Consumer Traffic: <strong class="text-emerald-700" id="classify-benign-stat">0 (0%)</strong></div>
                         <div>Attack Events Detected: <strong class="text-rose-600" id="classify-attack-stat">0 (0%)</strong></div>
                         <div>Primary Attack Vector: <strong class="text-gray-900" id="classify-vector-stat">HTTP/2 Concurrency Burst</strong></div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] pt-1 border-t border-gray-200" id="classify-eval-row">
+                        <div>Precision: <strong id="classify-precision">-</strong></div>
+                        <div>Recall: <strong id="classify-recall">-</strong></div>
+                        <div>False Positive Rate: <strong id="classify-fpr">-</strong></div>
+                        <div>F1: <strong id="classify-f1">-</strong></div>
+                        <div>Time-to-Detect (median / p95): <strong id="classify-ttd">-</strong></div>
+                        <div class="text-gray-500 text-[10px] w-full">Evaluated against the simulator's own labels: a sanity check, not an independent benchmark.</div>
                     </div>
                 </div>
 
@@ -3064,11 +3072,14 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <!-- LLM Provider Selector -->
                 <div>
                     <label class="block text-gray-600 font-bold mb-1">LLM Provider</label>
-                    <select id="config-llm-provider" class="w-full p-2 bg-white border border-gray-300 focus:border-black focus:outline-none text-xs">
+                    <select id="config-llm-provider" onchange="document.getElementById('config-model-name').value = ''" class="w-full p-2 bg-white border border-gray-300 focus:border-black focus:outline-none text-xs">
                         <option value="heuristic">Autonomous Heuristic Reasoner (Offline, Free, Zero-Setup)</option>
                         <option value="gemini">Google Gemini (Auto 1.5/2.0 Flash / Pro - Free Tier)</option>
                         <option value="groq">Groq Cloud (Llama 3.3 70B & DeepSeek R1 Free Tier)</option>
                         <option value="openrouter">OpenRouter Free Tier (:free models)</option>
+                        <option value="github">GitHub Models (Free with GitHub token)</option>
+                        <option value="cerebras">Cerebras (Llama 3.3 70B Free Tier)</option>
+                        <option value="sambanova">SambaNova (Llama 3.3 70B Free Tier)</option>
                         <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
                         <option value="ollama">Local Ollama (DeepSeek / Llama 3)</option>
                     </select>
@@ -3082,7 +3093,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                             [TEST API KEY]
                         </button>
                     </div>
-                    <input type="password" id="config-api-key" placeholder="Enter API Key (Gemini, Groq, or OpenAI)" class="w-full p-2 bg-white border border-gray-300 focus:border-black focus:outline-none text-xs">
+                    <input type="password" id="config-api-key" placeholder="Enter API key for the selected provider" class="w-full p-2 bg-white border border-gray-300 focus:border-black focus:outline-none text-xs">
                     <div id="key-test-feedback" class="hidden text-[10px] mt-1 font-mono"></div>
                 </div>
 
@@ -4698,7 +4709,24 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     const topVector = Object.keys(data.attack_type_breakdown || {})[0] || "HTTP/2 Single-Packet Race Condition";
                     if (vectorEl) vectorEl.innerText = `${topVector.replace(/_/g, ' ')} (${data.attack_type_breakdown?.[topVector] || 0})`;
                     if (timeEl) timeEl.innerText = `Classified 5,000 records in ${data.processing_time_ms}ms`;
-                    if (accEl) accEl.innerText = data.classification_accuracy ? `${data.classification_accuracy} MODEL CONFIDENCE` : "NOT EVALUATED";
+                    if (accEl) accEl.innerText = data.classification_accuracy && data.classification_accuracy !== "NOT_EVALUATED" ? `${data.classification_accuracy} ACCURACY (SYNTHETIC LABELS)` : "NOT EVALUATED";
+
+                    const ev = data.evaluation || {};
+                    const fmtPct = v => (v === null || v === undefined) ? "n/a" : `${v}%`;
+                    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+                    if (ev.status === "EVALUATED_ON_SYNTHETIC_LABELS") {
+                        const cm = ev.confusion_matrix || {};
+                        setText("classify-precision", `${fmtPct(ev.precision_pct)} (TP ${cm.tp}, FP ${cm.fp})`);
+                        setText("classify-recall", `${fmtPct(ev.recall_pct)} (FN ${cm.fn})`);
+                        setText("classify-fpr", fmtPct(ev.false_positive_rate_pct));
+                        setText("classify-f1", fmtPct(ev.f1_pct));
+                        const ttd = ev.time_to_detect || {};
+                        setText("classify-ttd", ttd.bursts_detected
+                            ? `${ttd.median_ms}ms / ${ttd.p95_ms}ms (${ttd.bursts_detected}/${ttd.bursts_seen} bursts)`
+                            : "n/a");
+                    } else {
+                        ["classify-precision", "classify-recall", "classify-fpr", "classify-f1", "classify-ttd"].forEach(id => setText(id, "not evaluated"));
+                    }
 
                     // Top KPI Cards already updated via classify-benign-stat and classify-attack-stat
 

@@ -16,6 +16,44 @@ def _label_to_bool(value: Any) -> Optional[bool]:
         return False
     return None
 
+def _pct(num: int, den: int) -> Optional[float]:
+    return round(num / den * 100, 2) if den else None
+
+
+def _evaluation_metrics(tp: int, fp: int, tn: int, fn: int,
+                        bursts: Dict[str, List[Optional[int]]]) -> Dict[str, Any]:
+    """Confusion-matrix metrics against the ground-truth label, plus per-burst time-to-detect."""
+    if not (tp + fp + tn + fn):
+        return {"status": "NOT_EVALUATED", "reason": "No ground-truth is_attack labels in the sample."}
+
+    precision = _pct(tp, tp + fp)
+    recall = _pct(tp, tp + fn)
+    f1 = round(2 * precision * recall / (precision + recall), 2) if precision and recall else None
+
+    delays = sorted(b[1] - b[0] for b in bursts.values() if b[1] is not None)
+    missed_bursts = sum(1 for b in bursts.values() if b[1] is None)
+    ttd = {
+        "bursts_seen": len(bursts),
+        "bursts_detected": len(delays),
+        "bursts_missed": missed_bursts,
+        "median_ms": delays[len(delays) // 2] if delays else None,
+        "p95_ms": delays[min(len(delays) - 1, int(len(delays) * 0.95))] if delays else None,
+        "definition": "Per attack burst: first flagged event time minus first event time.",
+    }
+
+    return {
+        "status": "EVALUATED_ON_SYNTHETIC_LABELS",
+        "confusion_matrix": {"tp": tp, "fp": fp, "tn": tn, "fn": fn},
+        "precision_pct": precision,
+        "recall_pct": recall,
+        "false_positive_rate_pct": _pct(fp, fp + tn),
+        "false_negative_rate_pct": _pct(fn, fn + tp),
+        "f1_pct": f1,
+        "time_to_detect": ttd,
+        "caveat": "Labels come from the project's own simulator; this is a sanity check, not a held-out evaluation.",
+    }
+
+
 def classify_traffic_row(row: Dict[str, Any]) -> Dict[str, Any]:
     """
     Hệ thống AI Tự xác định Traffic của AIGIS:
@@ -136,8 +174,9 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
         attack_types: Dict[str, int] = {}
         flagged_users: Dict[str, int] = {}
         flagged_ips: Dict[str, int] = {}
-        labeled_count = 0
-        labeled_correct = 0
+        tp = fp = tn = fn = 0
+        # burst_stream_id -> [first event ms, first flagged event ms]
+        bursts: Dict[str, List[Optional[int]]] = {}
 
         for r in rows:
             res = classify_traffic_row(r)
@@ -156,10 +195,25 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
                 benign_count += 1
 
             actual = _label_to_bool(r.get("is_attack"))
-            if actual is not None:
-                labeled_count += 1
-                if actual == res["is_attack"]:
-                    labeled_correct += 1
+            if actual is True:
+                if res["is_attack"]:
+                    tp += 1
+                else:
+                    fn += 1
+            elif actual is False:
+                if res["is_attack"]:
+                    fp += 1
+                else:
+                    tn += 1
+
+            burst_id = str(r.get("burst_stream_id") or "").strip()
+            epoch = r.get("epoch_ms")
+            if actual is True and burst_id not in ("", "NONE", "None", "null") and isinstance(epoch, (int, float)):
+                b = bursts.setdefault(burst_id, [None, None])
+                if b[0] is None or epoch < b[0]:
+                    b[0] = epoch
+                if res["is_attack"] and (b[1] is None or epoch < b[1]):
+                    b[1] = epoch
 
         elapsed = round((time.time() - t0) * 1000, 2)
         sample_size = len(rows)
@@ -171,8 +225,10 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
         top_ips = sorted(flagged_ips.items(), key=lambda x: x[1], reverse=True)[:5]
         top_users = sorted(flagged_users.items(), key=lambda x: x[1], reverse=True)[:5]
 
+        labeled_count = tp + fp + tn + fn
+        evaluation = _evaluation_metrics(tp, fp, tn, fn, bursts)
         if labeled_count:
-            classification_accuracy = f"{round(labeled_correct / labeled_count * 100, 2)}%"
+            classification_accuracy = f"{round((tp + tn) / labeled_count * 100, 2)}%"
         else:
             classification_accuracy = "NOT_EVALUATED"
 
@@ -189,6 +245,7 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
             "projected_attack_total": projected_attacks,
             "classification_accuracy": classification_accuracy,
             "accuracy_evaluated_on": labeled_count,
+            "evaluation": evaluation,
             "processing_time_ms": elapsed,
             "attack_type_breakdown": attack_types,
             "top_flagged_ips": [{"ip": item[0], "count": item[1]} for item in top_ips],

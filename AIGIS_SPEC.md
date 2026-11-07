@@ -1,162 +1,139 @@
-# 🛡️ AIGIS — Adversarial Intelligence for Generative Immunity & Security
-**Đặc tả Kiến trúc Hệ thống & Đột Phá Công Nghệ (System Architecture & Technical Specification)**
+# AIGIS — Adversarial Intelligence for Generative Immunity & Security
+**Đặc tả Kiến trúc Hệ thống (System Architecture & Technical Specification)**
 
 > [!IMPORTANT]
-> **Tuyên ngôn Dự án (Project Mission):**
-> $$\mathbf{A} \cdot \mathbf{I} \cdot \mathbf{G} \cdot \mathbf{I} \cdot \mathbf{S}$$
-> * **A** — **A**dversarial *(Tác chiến Đối kháng / Red Teaming)*
-> * **I** — **I**ntelligence for *(Hệ điều phối Đa Agent Thông minh)*
-> * **G** — **G**enerative *(Tự sinh Đòn Tấn công & Tự sinh Bản vá)*
-> * **I** — **I**mmunity & *(Cơ chế Tự sinh Miễn dịch Số / Self-Healing)*
-> * **S** — **S**ecurity *(Bảo vệ Toàn diện Logic Nghiệp vụ FinTech)*
+> **Phạm vi:** AIGIS hiện là **proof-of-concept**. Mọi đòn tấn công, bản vá, retest và benchmark đều chạy trên `backend/mock_target/store.py` (một đối tượng Python trong cùng tiến trình) với dữ liệu telemetry giả lập. Mỗi mục bên dưới ghi rõ **đã làm** (code hiện có) và **định hướng** (chưa làm).
 >
-> **Câu Pitch 30 giây (Elevator Pitch):**
-> *"Kẻ gian trong tài chính và thương mại điện tử không cần hack server — họ hack **Logic Nghiệp vụ (Business Logic)**. Họ tạo đua lệnh rút tiền, nhảy cóc bước thanh toán, hoặc lợi dụng sơ hở client để bòn rút sạch ngân sách khuyến mãi. Các công cụ DAST/SAST truyền thống hoàn toàn 'mù' trước lỗi logic này. **AIGIS** là nền tảng Đấu trường Đối kháng Tự hành đầu tiên trên thế giới: tự động dịch ngược mã nguồn client/API để vẽ lại bản đồ nghiệp vụ, thả **Hacker AI (Red Team)** vào tấn công tìm kẽ hở bòn rút tiền trong Sandbox, và điều phối **Defender AI (Blue Team)** tự sinh mã vá lỗi trước khi tính năng kịp lên Production."*
+> * **A** — **A**dversarial *(Tác chiến đối kháng / Red Teaming)*
+> * **I** — **I**ntelligence for *(Điều phối đa agent)*
+> * **G** — **G**enerative *(Sinh kịch bản tấn công & mã vá mẫu)*
+> * **I** — **I**mmunity & *(Vòng lặp vá – kiểm thử lại)*
+> * **S** — **S**ecurity *(Bảo vệ logic nghiệp vụ FinTech)*
 
 ---
 
-## 1. Vấn Đề Cốt Lõi: "Điểm Mù Triệu Đô" Của Ngành Bảo Mật
+## 1. Vấn đề
 
-### 1.1. Lỗ Hổng Logic Nghiệp Vụ (Business Logic Vulnerabilities - BLVs)
-Khác với các lỗi kỹ thuật thông thường (như SQL Injection, Buffer Overflow hay XSS), **Lỗ hổng Logic** xảy ra khi hệ thống phần mềm chạy *hoàn toàn đúng cú pháp code*, nhưng chuỗi hành vi của người dùng phá vỡ mục đích kinh tế của doanh nghiệp:
-* **Race Condition (Đua số dư ví):** Gửi đồng thời 20 request đổi mã quà tặng trong cùng 1 mili-giây trước khi cơ sở dữ liệu kịp khóa bản ghi.
-* **State-Machine Bypass (Nhảy cóc trạng thái):** Gọi thẳng API xác nhận đơn hàng mà bỏ qua bước trừ tiền hoặc bước xác thực OTP.
-* **Voucher Looping & Threshold Manipulation:** Lợi dụng logic hoàn tiền để nhân bản mã ưu đãi hoặc bơm số âm/thập phân vô hạn vào giỏ hàng.
+### 1.1. Lỗ hổng logic nghiệp vụ (Business Logic Vulnerabilities)
+Hệ thống chạy đúng cú pháp nhưng chuỗi hành vi của người dùng phá vỡ mục đích kinh tế:
+* **Race condition (TOCTOU):** gửi đồng thời nhiều request nhận quà trước khi hệ thống kịp ghi nhận lượt nhận đầu tiên.
+* **State-machine bypass:** gọi thẳng API xác nhận đơn, bỏ qua bước thanh toán hoặc OTP.
+* **Parameter tampering:** số âm, số thập phân bất thường trong số tiền.
+* **BOLA:** thao tác trên tài khoản không thuộc quyền sở hữu.
 
-### 1.2. Tại sao các công cụ hiện nay thất bại?
-* Các công cụ quét tĩnh/động (SAST/DAST) hiện nay chỉ phân tích cú pháp mã hoặc tìm lỗ hổng CVE đã biết. Chúng **không có khả năng hiểu ngữ cảnh kinh doanh**: chúng không biết 1 voucher giảm 50% chỉ được dùng một lần cho một khách hàng.
-* Thuê chuyên gia Red Team con người kiểm thử thâm nhập (Pen-test) thì cực kỳ đắt đỏ (`\$30,000–\$100,000`), tốn 3–4 tuần và hoàn toàn không theo kịp chu kỳ release tính năng liên tục hàng tuần của các sàn TMĐT.
+### 1.2. Vì sao khó phát hiện
+* SAST/DAST chủ yếu tìm mẫu lỗi kỹ thuật đã biết; chúng không biết quy tắc kinh doanh (ví dụ: "mỗi khách chỉ được nhận một voucher").
+* Lỗi race condition phụ thuộc thời gian, khó tái hiện bằng kiểm thử tuần tự.
+* Pentest thủ công tốn kém và không theo kịp chu kỳ release liên tục.
 
 ---
 
-## 2. Bốn Trụ Cột Đột Phá Công Nghệ Của AIGIS
-
-AIGIS giải quyết bài toán trên bằng 4 sáng kiến công nghệ độc quyền được tích hợp thành một vòng lặp khép kín:
+## 2. Bốn thành phần chính
 
 ```mermaid
 flowchart TD
-    subgraph AIGIS_Innovations["4 ĐỘT PHÁ CÔNG NGHỆ ĐỘC QUYỀN CỦA AIGIS"]
-        Inno1["1. REA State-Machine Reconstruction<br/>Dịch ngược mã Client (JS/APK) & Trích xuất Đồ thị Nghiệp vụ"]
-        Inno2["2. HTTP/2 Single-Packet Concurrency Fuzzer<br/>Kỹ thuật nén gói tin TCP để đua lệnh ở độ chính xác mili-giây"]
-        Inno3["3. Closed-Loop CRS Self-Healing<br/>Tự sinh Middleware Redis Lock & Xác minh Zero-Regression"]
-        Inno4["4. Financial Exposure Quantifier<br/>Lượng hóa thiệt hại thành dòng tiền thực ($ Exposure)"]
-    end
-
+    Inno1["1. Shadow API Discovery<br/>Regex trên client bundle"]
+    Inno2["2. Concurrency Burst Simulator<br/>N coroutine đồng thời trên mock store"]
+    Inno3["3. Patch & Retest Loop<br/>Mã vá mẫu + bật cờ khóa + retest + regression"]
+    Inno4["4. Financial Exposure Quantifier<br/>Quy thất thoát đo được thành tiền"]
     Inno1 --> Inno2 --> Inno3 --> Inno4
 ```
 
-### 2.1. REA State-Machine Reconstruction (Tái Tạo Máy Trạng Thái Bằng Dịch Ngược)
-Lập trình viên thường mắc sai lầm chí mạng: **chỉ kiểm tra điều kiện ở client** (vô hiệu hóa nút bấm bằng Javascript, kiểm tra hạn mức bằng code frontend) mà quên kiểm tra ở API backend, hoặc vô tình để lộ các API thử nghiệm (Shadow APIs) trong file bundle.
-* AIGIS trang bị bộ công cụ dịch ngược **REA (Reverse Engineering & Extraction)**:
-  * Phân tích tĩnh gói mã nguồn frontend (JavaScript bundle, React Native, Android APK).
-  * Khai quật toàn bộ endpoint ẩn chưa từng được công bố trong tài liệu API Swagger.
-  * Tự động dựng lại **Đồ thị Máy Trạng thái Nghiệp vụ (State Machine Graph)**: từ `Khởi tạo giỏ hàng` $\rightarrow$ `Áp mã giảm giá` $\rightarrow$ `Thanh toán` $\rightarrow$ `Xác nhận giao dịch`.
+### 2.1. Shadow API Discovery
+* **Đã làm:** quét `backend/mock_target/checkout_bundle.js` bằng regex để tìm chuỗi endpoint không có trong tài liệu API (`backend/agents/rea_dissector.py`).
+* **Định hướng:** phân tích AST cho JS bundle, hỗ trợ React Native/APK, dựng đồ thị máy trạng thái nghiệp vụ tự động.
 
-### 2.2. HTTP/2 Single-Packet Concurrency Fuzzer (Đua Lệnh Nén Gói Tin Độc Quyền)
-Trong môi trường mạng thực tế, các cuộc tấn công đua lệnh (Race Condition) rất dễ trượt do độ trễ mạng ngẫu nhiên (Network Jitter) làm các request đến server lệch nhau vài mili-giây.
-* AIGIS phát triển cơ chế **Single-Packet Synchronization**:
-  * Gom 20–30 request HTTP/2 độc lập vào **duy nhất một khung TCP**.
-  * Toàn bộ các request này chạm tới tầng mạng của server tại **cùng một mili-giây ($t_0$)**.
-  * Bóc trần hoàn toàn các lỗ hổng thiếu khóa nguyên tử (Atomic Lock / Idempotency Key) trong microservices.
+### 2.2. Concurrency Burst Simulator
+* **Đã làm:** `asyncio.gather` N lời gọi `claim_voucher` vào mock store; đếm số lần nhận trùng (`backend/agents/sandbox_runner.py`). Không có network I/O.
+* **Định hướng:** gửi request HTTP/2 đồng thời thật (kỹ thuật single-packet) vào một service mục tiêu riêng biệt, có giới hạn phạm vi và xác nhận quyền kiểm thử.
 
-### 2.3. Closed-Loop CRS Self-Healing (Tự Động Vá Lỗi Khép Kín)
-AIGIS không chỉ dừng lại ở việc đưa ra cảnh báo hay báo cáo dạng chữ mà con người phải đọc:
-* Agent Blue Team phân tích cú pháp AST của backend mục tiêu.
-* Tự động tổng hợp đoạn mã **Middleware phòng hộ (Idempotency Guard / Distributed Redis Lock)**.
-* Tự động cài bản vá vào môi trường Sandbox, sau đó kích hoạt lại bài tấn công cũ để xác nhận: **100% đòn tấn công đã bị vô hiệu hóa**.
-* Tự động chạy bài kiểm tra **Zero-Regression**: Giả lập 100 khách hàng bình thường để chứng minh độ trễ chỉ tăng $\le 2\text{ms}$ và không có giao dịch hợp lệ nào bị chặn nhầm.
+### 2.3. Patch & Retest Loop
+* **Đã làm:**
+  * Sinh **mã vá mẫu** cho SQL (ràng buộc UNIQUE + `ON CONFLICT`), FastAPI, Spring, Gin, Cloudflare, NGINX/Lua, AWS WAF (`backend/patch_exporter.py`). Mã mẫu chỉ để review, **không được thực thi**.
+  * "Áp bản vá" trên mock target = bật cờ khóa (dict trong bộ nhớ). Retest reset trạng thái và chỉ đạt khi **đúng 1** lượt nhận thành công.
+  * Regression check: chạy cùng nhóm người dùng hợp lệ khi tắt/bật bản vá, đo **tỷ lệ chặn nhầm** và **độ trễ tăng thêm** (`backend/agents/blue_aegis.py`). Không có số cứng.
+* **Định hướng:** áp bản vá vào service mục tiêu trong container, chạy lại bài tấn công qua mạng.
 
-### 2.4. Financial Exposure Quantifier (Định Giá Thiệt Hại Dòng Tiền)
-Thay vì xếp hạng rủi ro chung chung (Low, Medium, High), AIGIS quy đổi rủi ro thành **con số tiền mặt cụ thể**:
-$$\text{Financial Exposure} = \Delta \text{Vouchers / Cash Withdrawn} \times \text{Unit Value} \times \text{Expected Attack Velocity}$$
-Giúp ban lãnh đạo và giám đốc tài chính nhìn thấy ngay con số thiệt hại được cứu vãn tính bằng USD.
+### 2.4. Financial Exposure Quantifier
+$$\text{Thất thoát} = \text{Số lượt nhận trái phép} \times \text{Giá trị voucher}$$
+* **Đã làm:** tính trên từng lần chạy (trước vá / sau vá / giữ lại được). Điểm an toàn 0–100 là **heuristic demo**, không phải chứng nhận.
+* **Định hướng:** nhân với tần suất tấn công ước tính và ngân sách chiến dịch thực tế để ra con số theo chiến dịch.
 
 ---
 
-## 3. Kiến Trúc Đấu Trường Đối Kháng 5 Agents
+## 3. Kiến trúc agent
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Dev as Lập Trình Viên / Security Lead
-    participant A1 as Agent 1: REA Dissector
-    participant A2 as Agent 2: Red Team (Cerebrus)
-    participant SB as Agent 3: Sandbox Runner
-    participant A4 as Agent 4: Blue Team (Aegis)
-    participant A5 as Agent 5: Arbiter
+    actor Dev as Lập trình viên / Security Lead
+    participant A1 as REA Dissector
+    participant A2 as Red Team (Cerebrus)
+    participant SB as Sandbox Runner (mock store)
+    participant A4 as Blue Team (Aegis)
+    participant A5 as Arbiter
 
-    Dev->>A1: Nạp OpenAPI Spec + Mã nguồn Client Bundle
-    A1->>A1: Dịch ngược JS, bóc tách Shadow APIs & dựng State Graph
-    A1->>A2: Chuyển giao Đồ thị trạng thái & Điểm nghi vấn logic
-    A2->>A2: Sinh script HTTP/2 Single-Packet Concurrency Fuzzer
-    A2->>SB: Bắn payload đua lệnh vào Sandbox
-    SB-->>A2: Kết quả: Chiếm đoạt $7,500 (Race condition thành công)
-    SB->>A4: Kích hoạt cảnh báo tài chính & Cung cấp execution trace
-    A4->>A4: CRS Self-Healing: Sinh Middleware Redis Lock & Idempotency Key
-    A4->>SB: Nạp bản vá vào Sandbox & Re-test
-    SB-->>A4: Kết quả: 14/15 requests bị từ chối, Zero-Regression đạt chuẩn
-    A4->>A5: Chuyển giao báo cáo thẩm định
-    A5->>Dev: Xuất Financial Exposure Dossier + 1-Click Pull Request
+    Dev->>A1: Bắt đầu wargame
+    A1->>A1: Regex quét client bundle, liệt kê Shadow API
+    A1->>A2: Danh sách endpoint nghi vấn
+    A2->>SB: N lời gọi đồng thời
+    SB-->>A2: Số lượt nhận trùng + thất thoát đo được
+    SB->>A4: Kết quả tấn công
+    A4->>A4: Sinh mã vá mẫu
+    A4->>SB: Bật cờ khóa, retest + regression
+    SB-->>A4: Retest: 1 lượt hợp lệ; tỷ lệ chặn nhầm, độ trễ
+    A4->>A5: Kết quả
+    A5->>Dev: Financial Exposure Dossier + nội dung PR mô phỏng
 ```
 
-### ① Agent 1: REA Dissector (Trinh Sát Dịch Ngược)
-* **Nhiệm vụ:** Quét toàn diện mã nguồn client và tài liệu API.
-* **Đầu ra:** Bản đồ State Machine nghiệp vụ, danh sách Shadow Endpoints và các lỗ hổng do tin tưởng client-side validation.
-
-### ② Agent 2: Red Team — "Cerebrus" (Hacker AI Thực Chiến)
-* **Nhiệm vụ:** Suy nghĩ như kẻ gian, tự động viết script Python khai thác:
-  * *Concurrency Fuzzer:* Đua lệnh nhận quà/rút tiền qua cơ chế Single-Packet.
-  * *State Bypass:* Bỏ qua bước thanh toán gọi thẳng confirm.
-  * *Boundary Injection:* Thử nghiệm số âm và số thập phân tràn giới hạn.
-* **Đầu ra:** Script Python khai thác hoàn chỉnh (`exploit_poc.py`).
-
-### ③ Agent 3: Sandbox Runner (Võ Đài Thực Thi Cô Lập)
-* **Nhiệm vụ:** Chạy script tấn công trong môi trường container giả lập kết nối DB test.
-* **Đo lường:** Ghi nhận mã phản hồi HTTP, số lượng giao dịch lậu thành công, và tính toán số tiền bị chiếm đoạt thực tế.
-
-### ④ Agent 4: Blue Team — "Aegis" (Người Bảo Hộ Tự Chữa Lành)
-* **Nhiệm vụ:**
-  * Giải mã nguyên nhân gốc rễ (Root Cause Analysis).
-  * Tự động sinh mã nguồn Middleware vá lỗi (Redis Lock / Idempotency Key).
-  * Nạp bản vá vào backend và chạy lại đòn tấn công để chứng minh lỗi đã biến mất.
-  * Đo lường hiệu năng của khách hàng thật để bảo đảm không gây nghẽn hệ thống.
-
-### ⑤ Agent 5: Arbiter (Trọng Tài Đấu Trường)
-* **Nhiệm vụ:**
-  * Chấm điểm an toàn Logic Security Score (0–100).
-  * Xuất bản **Hồ sơ Rủi ro Tài chính (Financial Exposure Dossier)**.
-  * Tự động tạo **GitHub Pull Request** với đầy đủ code vá lỗi và unit test.
+Các agent bổ trợ:
+* **FinTech Sentinel** (`fintech_sentinel.py`): theo dõi TPS theo cửa sổ trượt, đạo hàm vận tốc, dự báo tuyến tính; lọc flash sale hợp lệ dựa trên tỷ lệ người dùng khác nhau, tỷ lệ proxy datacenter và khung giờ khuyến mãi.
+* **Quant Investigator** (`quant_investigator.py`): RCA bằng SQL tham số hóa, kết nối chỉ đọc; đo khoảng cách giữa các request của cùng người dùng (≤ 50ms = va chạm).
+* **SecOps Copilot** (`secops_copilot.py`): hỏi đáp, chuyển tiếp sang Investigator khi cần.
+* **Work Order Generator** (`work_order_generator.py`): phiếu thay đổi với kế hoạch canary 3 giai đoạn (chỉ xem trước, không deploy).
+* **Traffic Classifier** (`traffic_classifier.py`): heuristic 4 vector (burst, proxy ASN, User-Agent bot, thiếu idempotency key). Không dùng `user_id` hay nhãn `is_attack` làm đặc trưng. Báo cáo precision, recall, FPR, F1 so với nhãn giả lập.
 
 ---
 
-## 4. Cấu Trúc Mã Nguồn MVP
+## 4. Cấu trúc mã nguồn
 
 ```
 aigis/
 ├── backend/
-│   ├── server.py              # FastAPI server điều phối Wargame
+│   ├── server.py                 # FastAPI, token auth, bind 127.0.0.1
 │   ├── agents/
-│   │   ├── rea_dissector.py   # Agent 1: Bóc tách mã client & dựng State Graph
-│   │   ├── red_cerebrus.py    # Agent 2: Sinh script HTTP/2 Single-Packet Attack
-│   │   ├── sandbox_runner.py  # Agent 3: Thực thi exploit và đo lường tiền mất
-│   │   ├── blue_aegis.py      # Agent 4: Tự sinh Redis Idempotency Patch
-│   │   └── arbiter.py         # Agent 5: Tính điểm ROI & xuất PR GitHub
-│   └── target_mock/           # Ứng dụng thanh toán test có sẵn lỗi logic
-│       ├── app.py             # Endpoint /api/v1/voucher/claim (dính race condition)
-│       └── checkout.js        # File client mẫu để REA bóc tách
-└── frontend/                  # Giao diện Wargame Split-Screen
-    ├── src/
-    │   ├── components/
-    │   │   ├── RedTeamColumn.jsx   # Cột đỏ: Log REA, code exploit Python
-    │   │   ├── BlueTeamColumn.jsx  # Cột xanh: Code vá lỗi, Zero-regression test
-    │   │   └── DossierModal.jsx    # Báo cáo thiệt hại & nút 1-Click PR
+│   │   ├── rea_dissector.py      # Regex tìm Shadow API
+│   │   ├── red_cerebrus.py       # Burst coroutine (không HTTP)
+│   │   ├── sandbox_runner.py     # Chạy kịch bản trên mock store, tính thất thoát
+│   │   ├── blue_aegis.py         # Mã vá mẫu + regression check
+│   │   ├── arbiter.py            # Điểm heuristic, dossier, PR mô phỏng
+│   │   ├── adversarial_trainer.py# Điều phối wargame
+│   │   ├── fintech_sentinel.py   # Theo dõi drift TPS
+│   │   ├── quant_investigator.py # RCA SQL chỉ đọc
+│   │   ├── secops_copilot.py     # Hỏi đáp
+│   │   └── work_order_generator.py
+│   ├── mock_target/
+│   │   ├── store.py              # Mock voucher/ví có lỗi race condition, BOLA
+│   │   └── checkout_bundle.js    # Client bundle chứa endpoint ẩn
+│   ├── traffic_classifier.py
+│   ├── data_simulator.py         # Sinh dữ liệu giả lập 1 triệu dòng
+│   └── ...
+├── frontend/index.html           # Dashboard một trang
+└── tests/test_security_regressions.py
 ```
 
 ---
 
-## 5. Kịch Bản Thuyết Trình Sân Khấu 3 Phút (Hackathon Winning Pitch)
+## 5. Lộ trình
 
-* **0:00 – 0:30 (Mở đầu & Đặt vấn đề):** Nêu bật hiểm họa mất tiền triệu đô từ lỗ hổng logic nghiệp vụ mà các tool quét virus thông thường không thể thấy. Giới thiệu AIGIS.
-* **0:30 – 1:15 (Cảnh 1 - REA & Red Team):** Kéo thả code client vào giao diện $\rightarrow$ REA bóc trần sơ hở $\rightarrow$ Red Team tự viết Python nén 15 request vào 1 khung TCP bắn đua lệnh $\rightarrow$ Chiếm đoạt ngay \$7,500 trên màn hình.
-* **1:15 – 2:15 (Cảnh 2 - Blue Team Tự Vá):** Blue Team bừng sáng, tự động phân tích nguyên nhân $\rightarrow$ Tự sinh Middleware Redis Lock vá lỗi $\rightarrow$ Chạy lại đợt tấn công cũ: 14 request bị chặn đứng $\rightarrow$ Kiểm tra khách thật: thời gian phản hồi chỉ tăng 1.8ms.
-* **2:15 – 3:00 (Cảnh 3 - Hạ Màn & ROI):** Xuất Financial Exposure Dossier (Ngăn chặn thất thoát \$150,000) kèm nút bấm 1-Click đẩy Pull Request lên GitHub.
+| Hạng mục | Trạng thái |
+| :--- | :--- |
+| Mock target + vòng lặp tấn công / vá / retest | Đã làm |
+| Mã vá mẫu đa nền tảng | Đã làm (không thực thi) |
+| Regression check (chặn nhầm, độ trễ) | Đã làm (trên mock) |
+| Precision / recall / FPR cho bộ phân loại | Đã làm (trên dữ liệu giả lập) |
+| HTTP đồng thời thật vào service mục tiêu | Chưa |
+| Phân tích AST / APK | Chưa |
+| Tạo PR thật qua GitHub API | Chưa |
+| Tỷ lệ gian lận và giá trị giao dịch sát thực tế | Chưa |
+| Kịch bản gian lận ngân hàng (thử thẻ, ATO, tài khoản mule) | Chưa |
