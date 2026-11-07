@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Generator
 
 DATASETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datasets")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(DATASETS_DIR, "aigis_simulated_traffic_1m.csv")
 META_PATH = os.path.join(DATASETS_DIR, "aigis_simulated_traffic_1m_meta.json")
 
@@ -98,8 +99,11 @@ def generate_million_row_dataset(
         },
         "unpatched_total_drained_usd": 0.0,
         "patched_total_saved_usd": 0.0,
-        "csv_path": CSV_PATH,
-        "meta_path": META_PATH
+        "csv_path": os.path.relpath(CSV_PATH, PROJECT_ROOT),
+        "meta_path": os.path.relpath(META_PATH, PROJECT_ROOT),
+        # attack_ratio is the probability that a *batch* is an attack burst; each burst
+        # writes several rows, so the attack share of rows is much higher than attack_ratio.
+        "attack_ratio_param_per_batch": attack_ratio
     }
 
     sample_preview = []
@@ -289,6 +293,7 @@ def generate_million_row_dataset(
     stats["sample_preview"] = sample_preview
     stats["columns_count"] = len(headers)
     stats["columns"] = headers
+    stats["attack_row_pct"] = round(stats["attack_rows"] / max(1, total_written) * 100, 2)
 
     with open(META_PATH, "w", encoding="utf-8") as meta_f:
         json.dump(stats, meta_f, indent=2, ensure_ascii=False)

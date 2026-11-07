@@ -15,10 +15,9 @@ class SandboxRunnerAgent:
 
     async def execute_burst_attack(self, user_id: str = "usr_attacker_cerebrus_01", voucher_code: str = "TET2026_VIP", burst_count: int = 15, amount: float = 500.0) -> Dict[str, Any]:
         start_time = time.time()
-        if not mock_store.patch_enabled and not mock_store.patch_modules.get("concurrency_mutex"):
-            mock_store.user_claims.pop(user_id, None)
-            mock_store.distributed_lock.pop(f"lock:claim:{user_id}", None)
-        
+        # Every run starts from a clean scenario while preserving the deployed patch state.
+        mock_store.reset(preserve_patches=True)
+
         tasks = [
             mock_store.claim_voucher(user_id=user_id, voucher_code=voucher_code, amount=amount)
             for _ in range(burst_count)
@@ -36,6 +35,13 @@ class SandboxRunnerAgent:
         illegal_stolen_amount = illegal_claims_count * amount
 
         is_exploited = illegal_claims_count > 0
+        # A correct fix lets exactly one legitimate claim through; zero means the guard over-blocks.
+        if is_exploited:
+            run_status = "EXPLOIT_VERIFIED"
+        elif success_count == 1:
+            run_status = "EXPLOIT_NEUTRALIZED"
+        else:
+            run_status = "OVER_BLOCKED"
 
         logs = []
         for idx, res in enumerate(responses):
@@ -50,7 +56,7 @@ class SandboxRunnerAgent:
         return {
             "agent": "Sandbox Executor",
             "scenario": "TOCTOU_RACE_CONDITION",
-            "status": "EXPLOIT_VERIFIED" if is_exploited else "EXPLOIT_NEUTRALIZED",
+            "status": run_status,
             "is_vulnerable": is_exploited,
             "total_requests": burst_count,
             "total_burst_count": burst_count,
@@ -66,13 +72,16 @@ class SandboxRunnerAgent:
                 f"EXPLOIT CONFIRMED: Test account claimed {success_count} vouchers "
                 f"(Total value: ${total_stolen:,.2f}), exceeding allowance by {illegal_claims_count} claims due to missing Idempotency Lock."
                 if is_exploited else
-                f"EXPLOIT NEUTRALIZED: 1 legitimate request approved, {len(blocked_claims)} concurrent requests blocked by Aegis Idempotency Guard."
+                f"EXPLOIT NEUTRALIZED: {success_count} legitimate request approved, {len(blocked_claims)} concurrent requests blocked."
+                if success_count == 1 else
+                f"OVER-BLOCKED: {success_count} requests approved (expected exactly 1), {len(blocked_claims)} blocked."
             )
         }
 
     async def execute_bola_attack(self, attacker_id: str = "usr_attacker_cerebrus_01") -> Dict[str, Any]:
         """Tấn công BOLA / IDOR trích xuất trái phép tài khoản người khác"""
         t0 = time.time()
+        mock_store.reset(preserve_patches=True)
         logs = []
         targets = [
             {"account_id": "acc_victim_01", "amount": 5000.0},
@@ -118,6 +127,7 @@ class SandboxRunnerAgent:
     async def execute_tamper_attack(self, attacker_id: str = "usr_attacker_cerebrus_01") -> Dict[str, Any]:
         """Tấn công Negative Amount & Parameter Tampering"""
         t0 = time.time()
+        mock_store.reset(preserve_patches=True)
         logs = []
         payloads = [
             {"amount": -5000.0, "discount": 0.0, "desc": "Negative Amount Inversion"},
@@ -166,6 +176,7 @@ class SandboxRunnerAgent:
     async def execute_step_skipping_attack(self, attacker_id: str = "usr_attacker_cerebrus_01") -> Dict[str, Any]:
         """Tấn công Step-Skipping & State Machine Inversion"""
         t0 = time.time()
+        mock_store.reset(preserve_patches=True)
         logs = []
         order_id = f"ORD-EXPLOIT-{int(time.time()*1000)%10000}"
         

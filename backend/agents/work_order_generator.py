@@ -32,36 +32,44 @@ class SecOpsWorkOrderGenerator:
         inv_report: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Tong hop phieu can thiep ky thuat SecOps Work Order tu ket qua RCA"""
+        import re
         now = time.time()
         ticket_id = f"WO-2026-{int(now) % 10000:04d}"
-        
-        report = inv_report or global_quant_investigator.latest_report or {}
-        rca = report.get("root_cause_analysis", {})
-        qm = report.get("quantitative_metrics", {})
 
-        gap_ms = rca.get("vulnerability_gap_ms", 1.45)
-        stolen = rca.get("capital_loss_usd", 7500.0)
-        dirty_ratio = rca.get("dirty_read_probability", 0.933)
+        if not re.fullmatch(r"/[A-Za-z0-9_./:-]{1,120}", target_endpoint or ""):
+            target_endpoint = "/api/v1/voucher/claim"
+        if not re.fullmatch(r"[A-Z0-9_]{1,80}", threat_type or ""):
+            threat_type = "TOCTOU_RACE_CONDITION"
+
+        report = inv_report or global_quant_investigator.latest_report or {}
+        rca = report.get("root_cause_analysis", {}) or {}
+        qm = report.get("quantitative_metrics", {}) or {}
+
+        gap_ms = rca.get("vulnerability_gap_ms")
+        stolen = rca.get("capital_loss_usd")
+        dirty_ratio = rca.get("dirty_read_probability")
+        incident_id = report.get("incident_id") or None
 
         ticket = {
             "ticket_id": ticket_id,
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "READY_FOR_CANARY",
-            "priority": "P0_CRITICAL",
+            "status": "DRAFT_PENDING_APPROVAL",
+            "priority": "P0_CRITICAL" if stolen else "UNASSESSED",
             "target_service": "loyalty-checkout-service",
             "target_endpoint": target_endpoint,
             "threat_classification": threat_type,
-            "incident_reference": report.get("incident_id", "INC-2026-001"),
+            "incident_reference": incident_id,
             "quantitative_findings": {
                 "vulnerability_gap_ms": gap_ms,
-                "dirty_read_rate_pct": round(dirty_ratio * 100, 1),
+                "dirty_read_rate_pct": round(dirty_ratio * 100, 1) if dirty_ratio is not None else None,
                 "stolen_per_burst_usd": stolen,
-                "daily_exposure_defended_usd": 150000.0
+                "daily_exposure_defended_usd": None,
+                "note": "Values are taken from the RCA report; missing measurements are reported as null."
             },
             "middleware_patch_spec": {
                 "class_name": "RedisIdempotencyMiddleware",
                 "lock_type": "REDIS_SETNX_DISTRIBUTED_MUTEX",
-                "lock_key_pattern": "lock:voucher:{user_id}",
+                "lock_key_pattern": "aigis:lock:claim:{user_id}",
                 "lease_ttl_sec": 3.0,
                 "retry_backoff_ms": 50,
                 "max_retries": 3,
@@ -73,21 +81,21 @@ class SecOpsWorkOrderGenerator:
                     "stage": 1,
                     "traffic_pct": 5,
                     "window_minutes": 15,
-                    "health_gate": "P99 Latency Overhead <= 2.0ms and 0 False Positives",
+                    "health_gate": "P99 latency overhead <= 2.0ms and 0 false positives",
                     "status": "PENDING"
                 },
                 {
                     "stage": 2,
                     "traffic_pct": 25,
                     "window_minutes": 30,
-                    "health_gate": "HTTP 500 Error Rate == 0.00% across 5,000 requests",
+                    "health_gate": "HTTP 500 error rate == 0.00% across 5,000 requests",
                     "status": "PENDING"
                 },
                 {
                     "stage": 3,
                     "traffic_pct": 100,
                     "window_minutes": 0,
-                    "health_gate": "Full cluster production deployment and zero exploit bypass",
+                    "health_gate": "Full cluster deployment and zero exploit bypass",
                     "status": "PENDING"
                 }
             ],
@@ -97,9 +105,9 @@ class SecOpsWorkOrderGenerator:
                 "False positive customer purchase blocking > 0 transactions"
             ],
             "signoff_checklist": {
-                "architecture_review": "PASSED (Zero Single Point of Failure via Redis Sentinel/Cluster)",
-                "zero_regression_verified": "PASSED (50 simulated authentic customers completed with +1.4ms latency)",
-                "executive_approval": "APPROVED BY ARBITER"
+                "architecture_review": "NOT_ASSESSED",
+                "zero_regression_verified": "NOT_VERIFIED_IN_THIS_DEMO",
+                "executive_approval": "NOT_APPROVED"
             }
         }
 
@@ -107,28 +115,28 @@ class SecOpsWorkOrderGenerator:
         return ticket
 
     def simulate_rollout(self) -> Dict[str, Any]:
-        """Mo phong qua trinh trien khai canary 3 giai doan khong gay loi (Zero-Regression)"""
+        """Preview a canary rollout. This method does not deploy or measure production."""
         if not self.current_ticket:
             self.generate_work_order()
 
         ticket = self.current_ticket
-        # Advance stages
         for stage in ticket["canary_rollout_matrix"]:
-            stage["status"] = "PASSED_VERIFIED"
+            stage["status"] = "SIMULATED_PENDING_APPROVAL"
 
-        ticket["status"] = "DEPLOYED_PRODUCTION"
-        ticket["deployed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        ticket["status"] = "SIMULATED_ROLLOUT_PREVIEW"
+        ticket["deployed_at"] = None
 
         return {
             "success": True,
-            "status": "DEPLOYED_PRODUCTION",
+            "simulated": True,
+            "status": "SIMULATED_ROLLOUT_PREVIEW",
             "ticket": ticket,
             "verification_summary": {
-                "stage1_canary_5pct": "Passed: 0 errors, latency +1.2ms",
-                "stage2_canary_25pct": "Passed: 0 errors, latency +1.4ms",
-                "stage3_full_100pct": "Active: 100% traffic protected with Redis Distributed Mutex",
-                "total_stolen_prevented_usd": 150000.0,
-                "regressions_detected": 0
+                "stage1_canary_5pct": "Not executed; simulation preview only.",
+                "stage2_canary_25pct": "Not executed; simulation preview only.",
+                "stage3_full_100pct": "Not executed; no production traffic was modified.",
+                "total_stolen_prevented_usd": None,
+                "regressions_detected": None
             }
         }
 

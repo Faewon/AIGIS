@@ -151,7 +151,7 @@ class LiveStreamEngine:
             "user_id": user_id,
             "session_id": session_id,
             "account_age_days": random.randint(15, 1200),
-            "kyc_level": random.choice(["TIER_1_BASIC", "TIER_2_VERIFIED", "TIER_3_ENTERPRISE"]),
+            "kyc_level": random.choice(["UNVERIFIED", "TIER_1_BASIC", "TIER_2_VERIFIED", "VIP_ENTERPRISE"]),
             "credit_score": random.randint(580, 850),
             "client_ip": f"{random.randint(14, 210)}.{random.randint(10, 250)}.{random.randint(1, 254)}.{random.randint(1, 254)}",
             "ip_country": country,
@@ -180,7 +180,6 @@ class LiveStreamEngine:
         if not events:
             return
         
-        batch_len = len(events)
         conn = self._get_connection()
         cur = conn.cursor()
         
@@ -207,10 +206,18 @@ class LiveStreamEngine:
             """
             cur.executemany(insert_sql, events)
             
-            # 2. FIFO Rolling Deletion: Keep exact 1,000,000 rows
-            # Delete the oldest batch_len rows
-            cur.execute("DELETE FROM telemetry WHERE rowid IN (SELECT rowid FROM telemetry ORDER BY epoch_ms ASC LIMIT ?)", (batch_len,))
-            
+            # 2. FIFO Rolling Deletion: Only trim rows above TARGET_ROW_LIMIT
+            cur.execute("SELECT COUNT(*) FROM telemetry")
+            total_rows = cur.fetchone()[0]
+            deleted = 0
+            if total_rows > TARGET_ROW_LIMIT:
+                deleted = total_rows - TARGET_ROW_LIMIT
+                cur.execute(
+                    "DELETE FROM telemetry WHERE rowid IN "
+                    "(SELECT rowid FROM telemetry ORDER BY epoch_ms ASC LIMIT ?)",
+                    (deleted,)
+                )
+
             conn.commit()
             
             # 3. Update thread-safe in-memory metrics
@@ -225,7 +232,7 @@ class LiveStreamEngine:
                     else:
                         self.metrics["benign_count"] += 1
                 
-                self.metrics["rolling_deletions"] += batch_len
+                self.metrics["rolling_deletions"] += deleted
                 self.metrics["last_batch_time"] = time.time()
                 
         except Exception as e:

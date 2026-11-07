@@ -2,6 +2,7 @@
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIGIS - Autonomous Business Logic Vulnerability Proving Ground</title>
 
@@ -1244,7 +1245,7 @@ pre.bg-gray-950 code {
                 <button onclick="deleteActiveCustomDatabase()" id="btn-delete-active-db" class="hidden"></button>
 
                 <!-- Export CSV (Pure Text) -->
-                <a href="/api/v1/dataset/download" target="_blank" class="px-2.5 py-1 pbi-btn-green font-bold rounded text-[11px] shadow-2xs cursor-pointer transition text-center" style="background-color: #107c41 !important; color: #ffffff !important; border: 1px solid #0e6b37 !important;">Export CSV</a>
+                <a href="/api/v1/dataset/download" onclick="this.href='/api/v1/dataset/download?token='+encodeURIComponent(AIGIS_TOKEN)" target="_blank" class="px-2.5 py-1 pbi-btn-green font-bold rounded text-[11px] shadow-2xs cursor-pointer transition text-center" style="background-color: #107c41 !important; color: #ffffff !important; border: 1px solid #0e6b37 !important;">Export CSV</a>
             </div>
         </div>
     </header>
@@ -2552,7 +2553,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         </div>
 
                         <!-- Download CSV Button -->
-                        <a href="/api/v1/dataset/download" target="_blank" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 font-bold flex items-center space-x-1.5 transition">
+                        <a href="/api/v1/dataset/download" onclick="this.href='/api/v1/dataset/download?token='+encodeURIComponent(AIGIS_TOKEN)" target="_blank" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 font-bold flex items-center space-x-1.5 transition">
                             <span>[DOWNLOAD CSV (381MB)]</span>
                         </a>
                     </div>
@@ -2954,31 +2955,31 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2" id="compliance-matrix-container">
                         <div class="p-2 bg-white border border-gray-200 flex items-start justify-between">
                             <div>
-                                <div class="font-bold text-gray-900">PCI-DSS v4.0 (Req 6.5.10)</div>
-                                <div class="text-[11px] text-gray-500">Broken Business Logic & Race Conditions</div>
+                                <div class="font-bold text-gray-900">PCI-DSS v4.0 (Not assessed)</div>
+                                <div class="text-[11px] text-gray-500">Business logic security (demo mapping)</div>
                             </div>
-                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]">COMPLIANT</span>
+                            <span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 font-bold text-[10px]">NOT ASSESSED</span>
                         </div>
                         <div class="p-2 bg-white border border-gray-200 flex items-start justify-between">
                             <div>
                                 <div class="font-bold text-gray-900">OWASP API Security (API6:2023)</div>
                                 <div class="text-[11px] text-gray-500">Unrestricted Sensitive Flow Access</div>
                             </div>
-                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]">MITIGATED</span>
+                            <span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 font-bold text-[10px]">NOT ASSESSED</span>
                         </div>
                         <div class="p-2 bg-white border border-gray-200 flex items-start justify-between">
                             <div>
                                 <div class="font-bold text-gray-900">SBV Circular 09/2020/TT-NHNN</div>
                                 <div class="text-[11px] text-gray-500">Core Banking Transaction Idempotency</div>
                             </div>
-                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]">COMPLIANT</span>
+                            <span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 font-bold text-[10px]">NOT ASSESSED</span>
                         </div>
                         <div class="p-2 bg-white border border-gray-200 flex items-start justify-between">
                             <div>
                                 <div class="font-bold text-gray-900">NIST SP 800-53 Rev 5 (SC-5)</div>
                                 <div class="text-[11px] text-gray-500">Resource Exhaustion Protection</div>
                             </div>
-                            <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]">SATISFIED</span>
+                            <span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 font-bold text-[10px]">NOT ASSESSED</span>
                         </div>
                     </div>
                 </div>
@@ -3815,6 +3816,28 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
     <!-- ========================================================================= -->
     <script>
         const API_BASE = window.location.origin;
+        const AIGIS_TOKEN = document.querySelector('meta[name="aigis-token"]')?.getAttribute("content") || "";
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = function(input, init) {
+            const requestUrl = typeof input === "string" ? input : (input && input.url) || "";
+            const isSameOrigin = !requestUrl || requestUrl.startsWith("/") || requestUrl.startsWith(API_BASE);
+            if (isSameOrigin && AIGIS_TOKEN) {
+                const options = Object.assign({}, init || {});
+                options.headers = new Headers((init && init.headers) || {});
+                options.headers.set("X-AIGIS-Token", AIGIS_TOKEN);
+                return nativeFetch(input, options);
+            }
+            return nativeFetch(input, init);
+        };
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
         let tweakConfig = { burstStreams: 15, adversarialRounds: 5 };
         let currentFilter = 'all';
         let lastGeneratedSql = "";
@@ -4117,18 +4140,18 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     container.innerHTML += `
                         <div class="p-2.5 bg-gray-50 border border-gray-200 flex items-center justify-between">
                             <div>
-                                <div class="font-bold text-gray-900">${f.filename}</div>
-                                <div class="text-[10px] text-gray-500">${f.size_mb} MB • ${f.type.toUpperCase()} • ${activePill}</div>
+                                <div class="font-bold text-gray-900">${escapeHtml(f.filename)}</div>
+                                <div class="text-[10px] text-gray-500">${escapeHtml(f.size_mb)} MB • ${escapeHtml(f.type.toUpperCase())} • ${activePill}</div>
                             </div>
                             <div class="flex items-center space-x-1.5">
-                                ${!f.is_active ? `<button onclick="switchDirectDatabase('${f.filepath.replace(/\\/g, '/')}')" class="px-2 py-1 bg-black text-white hover:bg-gray-800 text-[10px] font-bold cursor-pointer font-mono">Connect</button>` : ''}
-                                <button onclick="deleteSpecificUploadedFile('${f.filename}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 border border-rose-300 text-[10px] font-bold cursor-pointer font-mono">Delete</button>
+                                ${!f.is_active ? `<button onclick="switchDirectDatabase(decodeURIComponent('${encodeURIComponent(f.filepath).replace(/'/g, '%27')}'))" class="px-2 py-1 bg-black text-white hover:bg-gray-800 text-[10px] font-bold cursor-pointer font-mono">Connect</button>` : ''}
+                                <button onclick="deleteSpecificUploadedFile(decodeURIComponent('${encodeURIComponent(f.filename).replace(/'/g, '%27')}'))" class="px-2 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 border border-rose-300 text-[10px] font-bold cursor-pointer font-mono">Delete</button>
                             </div>
                         </div>
                     `;
                 });
             } catch (err) {
-                container.innerHTML = `<div class="text-rose-500">Error loading uploads list: ${err}</div>`;
+                container.innerHTML = `<div class="text-rose-500">Error loading uploads list: ${escapeHtml(err.message || err)}</div>`;
             }
         }
 
@@ -4552,7 +4575,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
 
                 setTimeout(() => {
                     const s4 = document.getElementById("deep-stage-4");
-                    if (s4) { s4.innerText = `> [PHASE 4/4] Forensic Dossier sealed in ${data.processing_time_ms}ms with 99.4% confidence. [COMPLETED]`; s4.className = ""; }
+                    if (s4) { s4.innerText = `> [PHASE 4/4] Forensic Dossier sealed in ${data.processing_time_ms}ms. [COMPLETED]`; s4.className = ""; }
 
                     // Populate summary cards
                     document.getElementById("deep-total-examined").innerText = `${data.sample_analyzed.toLocaleString()} Events`;
@@ -4569,11 +4592,11 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                             mitreContainer.innerHTML += `
                                 <div class="p-2.5 bg-gray-50 border border-gray-200 space-y-1">
                                     <div class="flex items-center justify-between">
-                                        <span class="font-bold text-gray-900">${m.technique_id}</span>
-                                        <span class="px-1.5 py-0.2 text-[9px] font-bold ${badgeColor}">${m.severity} (CVSS ${m.cvss_score})</span>
+                                        <span class="font-bold text-gray-900">${escapeHtml(m.technique_id)}</span>
+                                        <span class="px-1.5 py-0.2 text-[9px] font-bold ${badgeColor}">${escapeHtml(m.severity)} (CVSS ${escapeHtml(m.cvss_score)})</span>
                                     </div>
-                                    <div class="font-bold text-gray-800 text-[11px]">${m.technique_name}</div>
-                                    <div class="text-[10px] text-gray-500">${m.description}</div>
+                                    <div class="font-bold text-gray-800 text-[11px]">${escapeHtml(m.technique_name)}</div>
+                                    <div class="text-[10px] text-gray-500">${escapeHtml(m.description)}</div>
                                     <div class="text-[10px] text-rose-600 font-bold pt-0.5">Detected: ${m.detected_events.toLocaleString()} events</div>
                                 </div>
                             `;
@@ -4587,10 +4610,10 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         data.top_rogue_ips.forEach(ip => {
                             rogueBody.innerHTML += `
                                 <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="p-2 font-bold text-rose-600 border-r border-gray-200">${ip.ip}</td>
-                                    <td class="p-2 text-gray-700 border-r border-gray-200">${ip.isp}</td>
-                                    <td class="p-2 font-bold text-gray-900 border-r border-gray-200">${ip.count.toLocaleString()} bursts</td>
-                                    <td class="p-2 text-gray-600 font-mono text-[10px]">${ip.endpoints.join(', ')}</td>
+                                    <td class="p-2 font-bold text-rose-600 border-r border-gray-200">${escapeHtml(ip.ip)}</td>
+                                    <td class="p-2 text-gray-700 border-r border-gray-200">${escapeHtml(ip.isp)}</td>
+                                    <td class="p-2 font-bold text-gray-900 border-r border-gray-200">${escapeHtml(ip.count)} bursts</td>
+                                    <td class="p-2 text-gray-600 font-mono text-[10px]">${escapeHtml((ip.endpoints || []).join(', '))}</td>
                                 </tr>
                             `;
                         });
@@ -4604,10 +4627,10 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                             hardContainer.innerHTML += `
                                 <div class="p-2 bg-gray-50 border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                                     <div>
-                                        <div class="font-bold text-gray-900">[${h.layer}]</div>
-                                        <div class="text-[10px] text-gray-600 font-mono mt-0.5">${h.rule}</div>
+                                        <div class="font-bold text-gray-900">[${escapeHtml(h.layer)}]</div>
+                                        <div class="text-[10px] text-gray-600 font-mono mt-0.5">${escapeHtml(h.rule)}</div>
                                     </div>
-                                    <span class="text-[10px] text-emerald-700 font-bold shrink-0">${h.target}</span>
+                                    <span class="text-[10px] text-emerald-700 font-bold shrink-0">${escapeHtml(h.target)}</span>
                                 </div>
                             `;
                         });
@@ -4675,7 +4698,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     const topVector = Object.keys(data.attack_type_breakdown || {})[0] || "HTTP/2 Single-Packet Race Condition";
                     if (vectorEl) vectorEl.innerText = `${topVector.replace(/_/g, ' ')} (${data.attack_type_breakdown?.[topVector] || 0})`;
                     if (timeEl) timeEl.innerText = `Classified 5,000 records in ${data.processing_time_ms}ms`;
-                    if (accEl) accEl.innerText = `${data.classification_accuracy || '99.4%'} MODEL CONFIDENCE`;
+                    if (accEl) accEl.innerText = data.classification_accuracy ? `${data.classification_accuracy} MODEL CONFIDENCE` : "NOT EVALUATED";
 
                     // Top KPI Cards already updated via classify-benign-stat and classify-attack-stat
 
@@ -4735,12 +4758,13 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 
                 const ai = r.ai_classification || {};
                 const isAttackFinal = ai.is_attack ?? isAttack;
-                const attackTypeFinal = ai.attack_type || r.attack_type || 'EXPLOIT';
-                const confidencePct = ai.confidence_pct || 99.4;
+                const attackTypeFinal = escapeHtml(ai.attack_type || r.attack_type || 'EXPLOIT');
+                const confidencePct = ai.confidence_pct;
+                const confidenceText = (confidencePct === null || confidencePct === undefined) ? '' : ` (${escapeHtml(confidencePct)}%)`;
 
                 const labelText = isAttackFinal 
-                    ? `<span class="font-mono text-rose-600 font-bold text-[10px]">[ATTACK: ${attackTypeFinal} (${confidencePct}%)]</span>`
-                    : `<span class="font-mono text-emerald-700 font-medium text-[10px]">[BENIGN: VERIFIED (${confidencePct}%)]</span>`;
+                    ? `<span class="font-mono text-rose-600 font-bold text-[10px]">[ATTACK: ${attackTypeFinal}${confidenceText}]</span>`
+                    : `<span class="font-mono text-emerald-700 font-medium text-[10px]">[BENIGN${confidenceText}]</span>`;
 
                 const unpatchedText = (r.status_code_unpatched == 200 && isAttack)
                     ? `<span class="text-rose-600 font-bold font-mono">200 (EXPLOIT)</span>`
@@ -4753,13 +4777,13 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const burstInfo = (!r.burst_stream_id || r.burst_stream_id === 'NONE') ? '-' : r.burst_concurrency_rank;
 
                 tr.innerHTML = `
-                    <td class="px-2.5 py-1.5 font-bold text-gray-900 border-r border-gray-200">${r.event_id}</td>
-                    <td class="px-2.5 py-1.5 text-gray-500 whitespace-nowrap border-r border-gray-200">${r.timestamp}</td>
-                    <td class="px-2.5 py-1.5 font-medium border-r border-gray-200">${r.user_id}</td>
-                    <td class="px-2.5 py-1.5 text-gray-600 whitespace-nowrap border-r border-gray-200">${r.ip_country} - ${(r.ip_isp || '').slice(0, 16)}</td>
-                    <td class="px-2.5 py-1.5 text-gray-800 font-mono text-[10px] border-r border-gray-200">${r.api_endpoint}</td>
-                    <td class="px-2.5 py-1.5 whitespace-nowrap border-r border-gray-200 ${isAttack ? 'text-rose-600 font-bold' : 'text-gray-400'}">${burstInfo}</td>
-                    <td class="px-2.5 py-1.5 text-gray-600 border-r border-gray-200">${r.network_rtt_ms}ms</td>
+                    <td class="px-2.5 py-1.5 font-bold text-gray-900 border-r border-gray-200">${escapeHtml(r.event_id)}</td>
+                    <td class="px-2.5 py-1.5 text-gray-500 whitespace-nowrap border-r border-gray-200">${escapeHtml(r.timestamp)}</td>
+                    <td class="px-2.5 py-1.5 font-medium border-r border-gray-200">${escapeHtml(r.user_id)}</td>
+                    <td class="px-2.5 py-1.5 text-gray-600 whitespace-nowrap border-r border-gray-200">${escapeHtml(r.ip_country)} - ${escapeHtml((r.ip_isp || "").slice(0, 16))}</td>
+                    <td class="px-2.5 py-1.5 text-gray-800 font-mono text-[10px] border-r border-gray-200">${escapeHtml(r.api_endpoint)}</td>
+                    <td class="px-2.5 py-1.5 whitespace-nowrap border-r border-gray-200 ${isAttack ? 'text-rose-600 font-bold' : 'text-gray-400'}">${escapeHtml(String(burstInfo))}</td>
+                    <td class="px-2.5 py-1.5 text-gray-600 border-r border-gray-200">${escapeHtml(String(r.network_rtt_ms))}ms</td>
                     <td class="px-2.5 py-1.5 border-r border-gray-200">${unpatchedText}</td>
                     <td class="px-2.5 py-1.5 border-r border-gray-200">${patchedText}</td>
                     <td class="px-2.5 py-1.5 whitespace-nowrap">${labelText}</td>
@@ -4881,14 +4905,14 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 metaTime.innerText = `[${data.execution_time_ms} ms]`;
 
                 const thead = document.getElementById("sql-results-thead");
-                thead.innerHTML = "<tr>" + data.columns.map(c => `<th class="px-2.5 py-1.5 border-r border-gray-200">${c}</th>`).join("") + "</tr>";
+                thead.innerHTML = "<tr>" + data.columns.map(c => `<th class="px-2.5 py-1.5 border-r border-gray-200">${escapeHtml(c)}</th>`).join("") + "</tr>";
 
                 const tbody = document.getElementById("sql-results-tbody");
                 tbody.innerHTML = "";
                 data.rows.forEach(r => {
                     const tr = document.createElement("tr");
                     tr.className = "hover:bg-gray-50 transition";
-                    tr.innerHTML = r.map(val => `<td class="px-2.5 py-1.5 border-r border-gray-200 font-mono">${val}</td>`).join("");
+                    tr.innerHTML = r.map(val => `<td class="px-2.5 py-1.5 border-r border-gray-200 font-mono">${escapeHtml(val)}</td>`).join("");
                     tbody.appendChild(tr);
                 });
             } catch (err) {
@@ -4996,7 +5020,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const tbody = document.getElementById("text2sql-results-tbody");
 
                 if (exec.success && exec.columns) {
-                    thead.innerHTML = "<tr>" + exec.columns.map(c => `<th class="px-2.5 py-1.5 border-r border-gray-200">${c}</th>`).join("") + "</tr>";
+                    thead.innerHTML = "<tr>" + exec.columns.map(c => `<th class="px-2.5 py-1.5 border-r border-gray-200">${escapeHtml(c)}</th>`).join("") + "</tr>";
                     tbody.innerHTML = "";
                     if (!exec.rows || !exec.rows.length) {
                         tbody.innerHTML = `<tr><td colspan="${exec.columns.length}" class="px-2.5 py-2 text-gray-400 italic">Query returned 0 rows.</td></tr>`;
@@ -5004,12 +5028,12 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         exec.rows.forEach(r => {
                             const tr = document.createElement("tr");
                             tr.className = "hover:bg-gray-50 transition";
-                            tr.innerHTML = r.map(val => `<td class="px-2.5 py-1.5 border-r border-gray-200 font-mono">${val}</td>`).join("");
+                            tr.innerHTML = r.map(val => `<td class="px-2.5 py-1.5 border-r border-gray-200 font-mono">${escapeHtml(val)}</td>`).join("");
                             tbody.appendChild(tr);
                         });
                     }
                 } else {
-                    tbody.innerHTML = `<tr><td class="px-2.5 py-2 text-rose-600 font-bold">SQL Execution Failed: ${exec.error || 'Unknown error'}</td></tr>`;
+                    tbody.innerHTML = `<tr><td class="px-2.5 py-2 text-rose-600 font-bold">SQL Execution Failed: ${escapeHtml(exec.error || 'Unknown error')}</td></tr>`;
                 }
 
             } catch (err) {
@@ -5050,11 +5074,11 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 thought1.innerHTML = `<div class="text-cyan-400 font-bold pb-0.5">> Agent 1: Code Dissector Log Stream:</div>`;
                 if (reaRes.thought_chain) {
                     reaRes.thought_chain.forEach(t => {
-                        thought1.innerHTML += `<div class="text-cyan-200/90">> ${t}</div>`;
+                        thought1.innerHTML += `<div class="text-cyan-200/90">> ${escapeHtml(t)}</div>`;
                     });
                 }
                 const shadowList = reaRes.shadow_endpoints ? reaRes.shadow_endpoints.join(", ") : (reaRes.shadow_apis_detected ? reaRes.shadow_apis_detected.join(", ") : "/api/v1/checkout/direct_confirm, /api/v1/voucher/claim");
-                thought1.innerHTML += `<div class="text-emerald-400 font-bold pt-1">> AST ANALYSIS COMPLETE: Discovered Shadow API: ${shadowList} | Validation: Client-Side Only (Bypassable)</div>`;
+                thought1.innerHTML += `<div class="text-emerald-400 font-bold pt-1">> AST ANALYSIS COMPLETE: Discovered Shadow API: ${escapeHtml(shadowList)} | Validation: Client-Side Only (Bypassable)</div>`;
 
                 if (badge) { badge.innerText = "DECOMPILED"; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
                 return reaRes;
@@ -5129,10 +5153,10 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 }
 
                 const logBox = document.getElementById("logs-sandbox");
-                logBox.innerHTML = `<div class="text-rose-400 font-bold pb-0.5">> Exploit Verified: ${attackRes.summary_message} (${attackRes.execution_time_ms}ms)</div>`;
+                logBox.innerHTML = `<div class="text-rose-400 font-bold pb-0.5">> Exploit Verified: ${escapeHtml(attackRes.summary_message)} (${escapeHtml(attackRes.execution_time_ms)}ms)</div>`;
                 if (attackRes.stream_logs) {
                     attackRes.stream_logs.forEach(l => {
-                        logBox.innerHTML += `<div class="text-rose-300">> ${l}</div>`;
+                        logBox.innerHTML += `<div class="text-rose-300">> ${escapeHtml(l)}</div>`;
                     });
                 }
 
@@ -5213,7 +5237,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 thought4.innerHTML = `<div class="text-sky-400 font-bold pb-0.5">> Agent 4: Auto-Remediator Reasoning Chain:</div>`;
                 if (patchRes.thought_chain) {
                     patchRes.thought_chain.forEach(t => {
-                        thought4.innerHTML += `<div class="text-sky-200/90">> ${t}</div>`;
+                        thought4.innerHTML += `<div class="text-sky-200/90">> ${escapeHtml(t)}</div>`;
                     });
                 }
                 const patchCode = patchRes.patch_code || "# Patch code generated.";
@@ -5275,24 +5299,27 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     })).json();
 
                     const vLog = document.getElementById("logs-verification");
-                    vLog.innerHTML = `<div class="text-cyan-400 font-bold pb-1">> MULTI-ROUND ADVERSARIAL CO-EVOLUTION COMPLETED (${trainRes.total_rounds} ROUNDS in ${trainRes.training_time_sec}s):</div>`;
+                    vLog.innerHTML = `<div class="text-cyan-400 font-bold pb-1">> MULTI-ROUND ADVERSARIAL CO-EVOLUTION COMPLETED (${escapeHtml(trainRes.total_rounds)} ROUNDS in ${escapeHtml(trainRes.training_time_sec)}s):</div>`;
                     trainRes.rounds_history.forEach(r => {
-                        vLog.innerHTML += `<div class="text-gray-200 font-bold mt-1">> [ROUND ${r.round}] ${r.title}</div>`;
-                        vLog.innerHTML += `<div class="text-rose-300 ml-3">  Red Attack: ${r.red_tactic} (Unpatched Loss: $${r.unpatched_loss_usd.toLocaleString()})</div>`;
-                        vLog.innerHTML += `<div class="text-sky-300 ml-3">  Blue Defense: ${r.blue_tactic} (Mitigation: ${r.mitigation_rate}%)</div>`;
-                        vLog.innerHTML += `<div class="text-emerald-400 ml-3 font-semibold">  Security Score: ${r.score_before} -> ${r.score_after} / 100 (Red ELO: ${r.red_elo} | Blue ELO: ${r.blue_elo})</div>`;
+                        vLog.innerHTML += `<div class="text-gray-200 font-bold mt-1">> [ROUND ${escapeHtml(r.round)}] ${escapeHtml(r.title)}</div>`;
+                        vLog.innerHTML += `<div class="text-rose-300 ml-3">  Red Attack: ${escapeHtml(r.red_tactic)} (Unpatched Loss: $${r.unpatched_loss_usd.toLocaleString()})</div>`;
+                        vLog.innerHTML += `<div class="text-sky-300 ml-3">  Blue Defense: ${escapeHtml(r.blue_tactic)} (Mitigation: ${escapeHtml(r.mitigation_rate)}%)</div>`;
+                        vLog.innerHTML += `<div class="text-emerald-400 ml-3 font-semibold">  Security Score: ${escapeHtml(r.score_before)} -> ${escapeHtml(r.score_after)} / 100 (Red ELO: ${escapeHtml(r.red_elo)} | Blue ELO: ${escapeHtml(r.blue_elo)})</div>`;
                     });
 
                     const reg = trainRes.regression_report || {};
-                    vLog.innerHTML += `<div class="text-cyan-400 font-bold pt-1.5">> ZERO-REGRESSION SUITE: ${reg.sample_users_tested || 50} legit users tested. ${reg.legitimate_requests_approved || 50} approved. False positives: ${reg.false_positive_rate || '0.0%'}</div>`;
+                    vLog.innerHTML += `<div class="text-cyan-400 font-bold pt-1.5">> ZERO-REGRESSION SUITE: ${escapeHtml(reg.sample_users_tested ?? 'N/A')} legit users tested. ${escapeHtml(reg.legitimate_requests_approved ?? 'N/A')} approved. False positives: ${escapeHtml(reg.false_positive_rate ?? 'N/A')}</div>`;
 
-                    document.getElementById("retest-mitigation").innerText = `${trainRes.training_summary?.total_capital_defended_usd?.toLocaleString() || '15,300'} Defended (100%)`;
-                    document.getElementById("sidebar-mitigation").innerText = "100%";
-                    document.getElementById("retest-fp").innerText = "0.0%";
-                    document.getElementById("sidebar-fp").innerText = "0.0%";
-                    document.getElementById("retest-latency").innerText = "+1.4ms";
-                    document.getElementById("sidebar-latency").innerText = "+1.4ms";
-                    if (badge) { badge.innerText = `NASH EQUILIBRIUM (${totalRounds}R)`; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
+                    const defended = trainRes.training_summary?.total_capital_defended_usd;
+                    const mitigation = trainRes.training_summary?.mitigation_rate;
+                    document.getElementById("retest-mitigation").innerText = defended === undefined ? "N/A" : `$${Number(defended).toLocaleString()} Defended (${mitigation ?? 'N/A'}%)`;
+                    document.getElementById("sidebar-mitigation").innerText = mitigation === undefined ? "N/A" : `${mitigation}%`;
+                    document.getElementById("retest-fp").innerText = reg.false_positive_rate ?? "N/A";
+                    document.getElementById("sidebar-fp").innerText = reg.false_positive_rate ?? "N/A";
+                    const trainLatency = reg.latency_overhead_ms;
+                    document.getElementById("retest-latency").innerText = trainLatency === undefined ? "N/A" : `+${trainLatency}ms`;
+                    document.getElementById("sidebar-latency").innerText = trainLatency === undefined ? "N/A" : `+${trainLatency}ms`;
+                    if (badge) { badge.innerText = `TRAINING COMPLETE (${totalRounds}R)`; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
                     return trainRes;
                 } else {
                     const retestData = await (await fetch(`${API_BASE}/api/v1/wargame/stage/5_retest`, {
@@ -5304,23 +5331,26 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     const retest = retestData.retest;
                     const reg = retestData.regression;
                     const totalStreams = retest.total_burst_count || retest.total_requests || tweakConfig.burstStreams || 15;
-                    document.getElementById("retest-mitigation").innerText = `${retest.blocked_requests}/${totalStreams} (100%)`;
-                    document.getElementById("sidebar-mitigation").innerText = "100%";
-                    document.getElementById("retest-fp").innerText = reg.false_positive_rate;
-                    document.getElementById("sidebar-fp").innerText = reg.false_positive_rate;
-                    document.getElementById("retest-latency").innerText = `+${reg.latency_overhead_ms}ms`;
-                    document.getElementById("sidebar-latency").innerText = `+${reg.latency_overhead_ms}ms`;
+                    const blocked = Number(retest.blocked_requests || 0);
+                    const mitigationPct = totalStreams > 0 ? ((blocked / totalStreams) * 100).toFixed(1) : "0.0";
+                    document.getElementById("retest-mitigation").innerText = `${blocked}/${totalStreams} (${mitigationPct}%)`;
+                    document.getElementById("sidebar-mitigation").innerText = `${mitigationPct}%`;
+                    document.getElementById("retest-fp").innerText = reg.false_positive_rate ?? "N/A";
+                    document.getElementById("sidebar-fp").innerText = reg.false_positive_rate ?? "N/A";
+                    const retestLatency = reg.latency_overhead_ms;
+                    document.getElementById("retest-latency").innerText = retestLatency === undefined ? "N/A" : `+${retestLatency}ms`;
+                    document.getElementById("sidebar-latency").innerText = retestLatency === undefined ? "N/A" : `+${retestLatency}ms`;
 
                     const vLog = document.getElementById("logs-verification");
-                    vLog.innerHTML = `<div class="text-emerald-400 font-bold pb-0.5">> RETEST RESULT: ${retest.summary_message}</div>`;
+                    vLog.innerHTML = `<div class="text-emerald-400 font-bold pb-0.5">> RETEST RESULT: ${escapeHtml(retest.summary_message)}</div>`;
                     if (retest.stream_logs) {
                         retest.stream_logs.forEach(l => {
-                            vLog.innerHTML += `<div class="text-emerald-300">> ${l}</div>`;
+                            vLog.innerHTML += `<div class="text-emerald-300">> ${escapeHtml(l)}</div>`;
                         });
                     }
-                    vLog.innerHTML += `<div class="text-cyan-400 font-bold pt-1.5">> ZERO-REGRESSION SUITE: ${reg.sample_users_tested} legit users tested. ${reg.legitimate_requests_approved} approved. False positives: ${reg.false_positive_rate}</div>`;
+                    vLog.innerHTML += `<div class="text-cyan-400 font-bold pt-1.5">> ZERO-REGRESSION SUITE: ${escapeHtml(reg.sample_users_tested)} legit users tested. ${escapeHtml(reg.legitimate_requests_approved)} approved. False positives: ${escapeHtml(reg.false_positive_rate)}</div>`;
 
-                    if (badge) { badge.innerText = "100% BLOCKED"; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
+                    if (badge) { badge.innerText = `${mitigationPct}% BLOCKED`; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
                     return retestData;
                 }
             } catch (err) {
@@ -5364,8 +5394,8 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
 
                 if (data.success) {
                     const blockRateStr = `${data.total_blocked}/${data.total_exploit_attempts} (${data.mitigation_rate}%)`;
-                    const fpRateStr = "0.0%";
-                    const latStr = `+${(data.avg_latency_ms || 1.4).toFixed(1)}ms`;
+                    const fpRateStr = data.false_positive_rate ?? "N/A";
+                    const latStr = data.avg_latency_ms === undefined ? "N/A" : `+${Number(data.avg_latency_ms).toFixed(1)}ms`;
 
                     document.getElementById("retest-mitigation").innerText = blockRateStr;
                     document.getElementById("sidebar-mitigation").innerText = `${data.mitigation_rate}%`;
@@ -5375,12 +5405,12 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     document.getElementById("sidebar-latency").innerText = latStr;
 
                     if (vLog) {
-                        vLog.innerHTML = `<div class="text-emerald-400 font-bold pb-1">> MULTI-CYCLE RECHECK COMPLETE (${data.total_cycles} CYCLES in ${data.execution_time_sec}s):</div>`;
-                        vLog.innerHTML += `<div class="text-sky-300 font-mono mb-2">> Total Streams Tested: ${data.total_exploit_attempts} | Leaked: ${data.total_leaked} | Blocked: ${data.total_blocked} | Jitter Variance: ${data.jitter_variance_ms}ms</div>`;
+                        vLog.innerHTML = `<div class="text-emerald-400 font-bold pb-1">> MULTI-CYCLE RECHECK COMPLETE (${escapeHtml(data.total_cycles)} CYCLES in ${escapeHtml(data.execution_time_sec)}s):</div>`;
+                        vLog.innerHTML += `<div class="text-sky-300 font-mono mb-2">> Total Streams Tested: ${escapeHtml(data.total_exploit_attempts)} | Leaked: ${escapeHtml(data.total_leaked)} | Blocked: ${escapeHtml(data.total_blocked)} | Jitter Variance: ${escapeHtml(data.jitter_variance_ms)}ms</div>`;
                         (data.cycles_history || []).forEach(c => {
-                            vLog.innerHTML += `<div class="text-gray-200 font-mono mt-1">> [CYCLE ${c.cycle}] Streams: ${c.streams} | Blocked: ${c.blocked} | Approved: ${c.approved} | Jitter: +${c.jitter_injected_ms}ms | Latency: ${c.elapsed_ms}ms -> <span class="text-emerald-400 font-bold">${c.status}</span></div>`;
+                            vLog.innerHTML += `<div class="text-gray-200 font-mono mt-1">> [CYCLE ${escapeHtml(c.cycle)}] Streams: ${escapeHtml(c.streams)} | Blocked: ${escapeHtml(c.blocked)} | Approved: ${escapeHtml(c.approved)} | Jitter: +${escapeHtml(c.jitter_injected_ms)}ms | Latency: ${escapeHtml(c.elapsed_ms)}ms -> <span class="text-emerald-400 font-bold">${escapeHtml(c.status)}</span></div>`;
                         });
-                        vLog.innerHTML += `<div class="text-emerald-400 font-bold pt-2">> VERDICT: ${data.verdict}</div>`;
+                        vLog.innerHTML += `<div class="text-emerald-400 font-bold pt-2">> VERDICT: ${escapeHtml(data.verdict)}</div>`;
                     }
 
                     if (badge) {
@@ -5388,14 +5418,14 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                         badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider";
                     }
                 } else {
-                    if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> FAILED: ${data.error || 'Unknown error'}</div>`;
+                    if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> FAILED: ${escapeHtml(data.error || 'Unknown error')}</div>`;
                     if (badge) {
                         badge.innerText = "FAILED";
                         badge.className = "text-xs font-mono font-bold text-rose-600 uppercase tracking-wider";
                     }
                 }
             } catch (err) {
-                if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> RECHECK ERROR: ${err}</div>`;
+                if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> RECHECK ERROR: ${escapeHtml(err)}</div>`;
                 if (badge) {
                     badge.innerText = "ERROR";
                     badge.className = "text-xs font-mono font-bold text-rose-600 uppercase tracking-wider";
@@ -5414,14 +5444,14 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
 
             try {
                 const dossier = await (await fetch(`${API_BASE}/api/v1/wargame/stage/6_dossier`, {method: "POST"})).json();
-                const scoreBefore = dossier.initial_score ?? dossier.security_score_before ?? 32;
-                const scoreAfter = dossier.patched_score ?? dossier.security_score_after ?? 99;
+                const scoreBefore = dossier.initial_score ?? dossier.security_score_before ?? null;
+                const scoreAfter = dossier.patched_score ?? dossier.security_score_after ?? null;
                 const prDiff = dossier.git_pull_request_diff ?? dossier.git_pull_request?.diff ?? "";
-                const savedAmount = dossier.financial_exposure_saved ?? 150000;
+                const savedAmount = dossier.financial_exposure_saved ?? null;
 
-                document.getElementById("arbiter-score").innerText = `${scoreBefore} -> ${scoreAfter} / 100`;
-                document.getElementById("arbiter-exposure").innerText = `$${savedAmount.toLocaleString()} / day`;
-                document.getElementById("sidebar-saved").innerText = `$${savedAmount.toLocaleString()}/d`;
+                document.getElementById("arbiter-score").innerText = (scoreBefore === null || scoreAfter === null) ? "N/A" : `${scoreBefore} -> ${scoreAfter} / 100`;
+                document.getElementById("arbiter-exposure").innerText = savedAmount === null ? "N/A" : `$${Number(savedAmount).toLocaleString()} / day`;
+                document.getElementById("sidebar-saved").innerText = savedAmount === null ? "N/A" : `$${Number(savedAmount).toLocaleString()}/d`;
                 document.getElementById("code-diff-preview").innerText = prDiff;
                 const modalDiff = document.getElementById("modal-diff-content");
                 if (modalDiff) modalDiff.innerText = prDiff;
@@ -5434,7 +5464,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     const bd = sb.breakdown || {};
                     const badge = document.getElementById("arbiter-posture-badge");
                     if (badge) {
-                        badge.innerText = sb.posture_rating || "HARDENED / PRODUCTION READY";
+                        badge.innerText = sb.posture_rating || "NOT ASSESSED";
                     }
                     const deltaEl = document.getElementById("arbiter-score-delta");
                     if (deltaEl) deltaEl.innerText = `Delta: +${sb.score_delta} pts`;
@@ -5476,11 +5506,11 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                             compContainer.innerHTML += `
                                 <div class="p-2 bg-white border border-gray-200 flex items-start justify-between">
                                     <div>
-                                        <div class="font-bold text-gray-900">${c.framework} (${c.clause})</div>
-                                        <div class="text-[11px] text-gray-500">${c.name}</div>
-                                        <div class="text-[10px] text-gray-400 mt-0.5">${c.detail || ''}</div>
+                                        <div class="font-bold text-gray-900">${escapeHtml(c.framework)} (${escapeHtml(c.clause)})</div>
+                                        <div class="text-[11px] text-gray-500">${escapeHtml(c.name)}</div>
+                                        <div class="text-[10px] text-gray-400 mt-0.5">${escapeHtml(c.detail || '')}</div>
                                     </div>
-                                    <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]">${c.status || 'COMPLIANT'}</span>
+                                    <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px]">${escapeHtml(c.status || 'NOT ASSESSED')}</span>
                                 </div>
                             `;
                         });
@@ -5761,7 +5791,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     if (!res.has_pii_leak) {
                         container.innerHTML = `<div class="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs">PASSED: No unmasked Credit Card PAN, National ID, or Bearer Token leaks detected. Fully compliant with PCI-DSS Req 3.4.</div>`;
                     } else {
-                        container.innerHTML = `<div class="font-bold text-rose-700 uppercase text-[11px]">WARNING: ${res.total_leaks_found} Unmasked Data Leaks Detected:</div>`;
+                        container.innerHTML = `<div class="font-bold text-rose-700 uppercase text-[11px]">WARNING: ${escapeHtml(res.total_leaks_found)} Unmasked Data Leaks Detected:</div>`;
                         res.findings.forEach(f => {
                             container.innerHTML += `
                                 <div class="p-2.5 bg-rose-50 border border-rose-200 text-xs font-mono space-y-1">
@@ -5777,7 +5807,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     }
                 }
             } catch (err) {
-                if (container) container.innerHTML = `<div class="text-rose-600">Scan error: ${err}</div>`;
+                if (container) container.innerHTML = `<div class="text-rose-600">Scan error: ${escapeHtml(err)}</div>`;
             }
         }
 
@@ -5872,9 +5902,9 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                             : '<span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold text-[9px]">VERIFIED</span>';
                         container.querySelector("tbody").innerHTML += `
                             <tr class="border-b border-gray-100">
-                                <td class="p-1.5 font-bold">${e.method}</td>
-                                <td class="p-1.5 font-bold text-gray-900">${e.path}</td>
-                                <td class="p-1.5 text-gray-500">${e.summary}</td>
+                                <td class="p-1.5 font-bold">${escapeHtml(e.method)}</td>
+                                <td class="p-1.5 font-bold text-gray-900">${escapeHtml(e.path)}</td>
+                                <td class="p-1.5 text-gray-500">${escapeHtml(e.summary)}</td>
                                 <td class="p-1.5">${riskBadge}</td>
                             </tr>
                         `;
@@ -5882,7 +5912,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     container.innerHTML += `</table></div>`;
                 }
             } catch (err) {
-                if (container) container.innerHTML = `<div class="text-rose-600">Parse error: ${err}</div>`;
+                if (container) container.innerHTML = `<div class="text-rose-600">Parse error: ${escapeHtml(err.message || err)}</div>`;
             }
         }
 
@@ -6232,16 +6262,16 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             const offset = (page - 1) * dataViewPageSize;
 
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-8 text-center text-slate-400 italic font-mono">Loading data for ${tableName}...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-8 text-center text-slate-400 italic font-mono">Loading data for ${escapeHtml(tableName)}...</td></tr>`;
             }
 
             try {
                 const searchParam = dataViewSearchQuery ? `&search=${encodeURIComponent(dataViewSearchQuery)}` : "";
-                const res = await fetch(`${API_BASE}/api/v1/database/table_data?table_name=${tableName}&limit=${dataViewPageSize}&offset=${offset}${searchParam}`);
+                const res = await fetch(`${API_BASE}/api/v1/database/table_data?table_name=${encodeURIComponent(tableName)}&limit=${dataViewPageSize}&offset=${offset}${searchParam}`);
                 const data = await res.json();
 
                 if (!res.ok || data.error) {
-                    if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500 font-mono">Error: ${data.error || "Failed to load"}</td></tr>`;
+                    if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500 font-mono">Error: ${escapeHtml(data.error || "Failed to load")}</td></tr>`;
                     return;
                 }
 
@@ -6272,15 +6302,15 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                         if (col.pk) {
                             keyBadge = `<span class="text-amber-500 font-bold ml-1" title="Primary Key">PK</span>`;
                         } else if (col.fk_to) {
-                            keyBadge = `<span class="text-sky-500 font-bold ml-1" title="Foreign Key -> ${col.fk_to}">FK</span>`;
+                            keyBadge = `<span class="text-sky-500 font-bold ml-1" title="Foreign Key -> ${escapeHtml(col.fk_to)}">FK</span>`;
                         }
                         headHtml += `
                             <th class="px-3 py-2 border-r border-slate-200 whitespace-nowrap bg-slate-50">
                                 <div class="flex items-center space-x-1">
-                                    <span class="text-slate-800 font-bold">${col.name}</span>
+                                    <span class="text-slate-800 font-bold">${escapeHtml(col.name)}</span>
                                     ${keyBadge}
                                 </div>
-                                <div class="text-[9px] text-slate-400 font-mono font-normal lowercase">${col.type || 'text'}</div>
+                                <div class="text-[9px] text-slate-400 font-mono font-normal lowercase">${escapeHtml(col.type || 'text')}</div>
                             </th>
                         `;
                     });
@@ -6292,7 +6322,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 if (tbody) {
                     const rows = data.rows || [];
                     if (rows.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="${(data.columns || []).length || 1}" class="px-4 py-8 text-center text-slate-400 italic">No matching rows found in ${tableName}.</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="${(data.columns || []).length || 1}" class="px-4 py-8 text-center text-slate-400 italic">No matching rows found in ${escapeHtml(tableName)}.</td></tr>`;
                     } else {
                         let bodyHtml = "";
                         rows.forEach((r, idx) => {
@@ -6300,11 +6330,15 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                             const rowBg = isEven ? "bg-white" : "bg-slate-50/50";
                             bodyHtml += `<tr class="${rowBg} hover:bg-[#f1f7fc] transition-colors">`;
                             (data.columns || []).forEach(col => {
-                                let val = r[col.name];
-                                if (val === null || val === undefined) {
+                                const rawVal = r[col.name];
+                                let val;
+                                if (rawVal === null || rawVal === undefined) {
                                     val = `<span class="text-slate-300 italic">null</span>`;
-                                } else if (typeof val === "string" && val.length > 45) {
-                                    val = `<span title="${val.replace(/"/g, '&quot;')}">${val.substring(0, 42)}...</span>`;
+                                } else {
+                                    const safeVal = escapeHtml(String(rawVal));
+                                    val = safeVal.length > 45
+                                        ? `<span title="${safeVal}">${safeVal.substring(0, 42)}...</span>`
+                                        : safeVal;
                                 }
                                 bodyHtml += `<td class="px-3 py-1.5 border-r border-slate-100 whitespace-nowrap">${val}</td>`;
                             });
@@ -6335,7 +6369,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
             } catch (err) {
                 console.error("loadDataViewTable error:", err);
-                if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500 font-mono">Error: ${err}</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500 font-mono">Error: ${escapeHtml(err.message || err)}</td></tr>`;
             }
         }
 
@@ -6970,7 +7004,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             // 5. Update Thought Log
             const thoughtLog = document.getElementById("sentinel-thought-log");
             if (thoughtLog && Array.isArray(state.thought_chain)) {
-                thoughtLog.innerHTML = state.thought_chain.map(line => `<div>${line}</div>`).join("");
+                thoughtLog.innerHTML = state.thought_chain.map(line => `<div>${escapeHtml(line)}</div>`).join("");
             }
         }
 
@@ -6984,18 +7018,18 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                         const isActive = p.is_active === 1;
                         return `
                             <tr class="hover:bg-slate-50">
-                                <td class="p-2 font-bold text-slate-900">${p.rule_id}</td>
-                                <td class="p-2">${p.name}</td>
-                                <td class="p-2 font-mono text-[10px] text-indigo-700">${p.rule_type}</td>
-                                <td class="p-2 font-mono text-[10px]">${p.endpoint}</td>
-                                <td class="p-2 font-bold">${p.threshold_value}</td>
+                                <td class="p-2 font-bold text-slate-900">${escapeHtml(p.rule_id)}</td>
+                                <td class="p-2">${escapeHtml(p.name)}</td>
+                                <td class="p-2 font-mono text-[10px] text-indigo-700">${escapeHtml(p.rule_type)}</td>
+                                <td class="p-2 font-mono text-[10px]">${escapeHtml(p.endpoint)}</td>
+                                <td class="p-2 font-bold">${escapeHtml(String(p.threshold_value))}</td>
                                 <td class="p-2">
                                     <span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'}">
                                         ${isActive ? 'ACTIVE' : 'DISABLED'}
                                     </span>
                                 </td>
                                 <td class="p-2 text-right">
-                                    <button onclick="toggleSentinelPolicy('${p.rule_id}', ${isActive ? 0 : 1})" class="px-2 py-0.5 rounded text-[10px] font-bold border ${isActive ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'} cursor-pointer">
+                                    <button onclick="toggleSentinelPolicy('${escapeHtml(p.rule_id)}', ${isActive ? 0 : 1})" class="px-2 py-0.5 rounded text-[10px] font-bold border ${isActive ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'} cursor-pointer">
                                         ${isActive ? 'Disable' : 'Enable'}
                                     </button>
                                 </td>
@@ -7032,13 +7066,13 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                         const sevColor = inc.severity === 'CRITICAL' ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-amber-700 bg-amber-50 border-amber-200';
                         return `
                             <tr class="hover:bg-slate-50">
-                                <td class="p-2 font-bold text-slate-900 font-mono">${inc.incident_id}</td>
-                                <td class="p-2 font-bold text-indigo-700 font-mono text-[10px]">${inc.threat_type}</td>
-                                <td class="p-2 font-mono text-[10px]">${inc.target_endpoint}</td>
-                                <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${sevColor}">${inc.severity}</span></td>
+                                <td class="p-2 font-bold text-slate-900 font-mono">${escapeHtml(inc.incident_id)}</td>
+                                <td class="p-2 font-bold text-indigo-700 font-mono text-[10px]">${escapeHtml(inc.threat_type)}</td>
+                                <td class="p-2 font-mono text-[10px]">${escapeHtml(inc.target_endpoint)}</td>
+                                <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${sevColor}">${escapeHtml(inc.severity)}</span></td>
                                 <td class="p-2 font-bold text-slate-800">$${(inc.financial_loss || 0).toLocaleString()}</td>
-                                <td class="p-2 text-[10px] text-slate-600 truncate max-w-xs" title="${inc.remediation_patch}">${inc.remediation_patch}</td>
-                                <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">${inc.status}</span></td>
+                                <td class="p-2 text-[10px] text-slate-600 truncate max-w-xs" title="${escapeHtml(inc.remediation_patch)}">${escapeHtml(inc.remediation_patch)}</td>
+                                <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">${escapeHtml(inc.status)}</span></td>
                             </tr>
                         `;
                     }).join("");
@@ -7138,8 +7172,8 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
             if (threatBadge) threatBadge.textContent = `${report.threat_type || 'TOCTOU RACE CONDITION'} DETECTED`;
             if (incIdEl) incIdEl.textContent = report.incident_id || "INC-2026";
-            if (summaryEl) summaryEl.textContent = rca.rca_summary || "Vulnerability verified.";
-            if (patchEl) patchEl.textContent = rca.remediation_patch || "Proven Mitigation: Redis Distributed Lock.";
+            if (summaryEl) summaryEl.textContent = rca.rca_summary || "No RCA summary available.";
+            if (patchEl) patchEl.textContent = rca.remediation_patch || "No remediation specification available.";
 
             // 2. Update KPI Cards
             const gapEl = document.getElementById("investigator-kpi-gap");
@@ -7150,13 +7184,13 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             const claimsEl = document.getElementById("investigator-kpi-claims");
             const durEl = document.getElementById("investigator-kpi-duration");
 
-            if (gapEl) gapEl.innerHTML = `${(rca.vulnerability_gap_ms || 1.45).toFixed(2)} <span class="text-xs font-normal text-slate-500">ms</span>`;
-            if (minGapEl) minGapEl.textContent = `Min Gap: ${(rca.min_observed_gap_ms || 0.42).toFixed(2)}ms`;
-            if (dirtyEl) dirtyEl.innerHTML = `${Math.round((rca.dirty_read_probability || 0.933) * 100)}% <span class="text-xs font-normal text-slate-500">ratio</span>`;
-            if (burstTpsEl) burstTpsEl.textContent = `Burst Velocity: ${(qm.tps_in_burst || 18.1).toFixed(1)} tx/s`;
-            if (lossEl) lossEl.textContent = `$${(rca.capital_loss_usd || 7500.0).toLocaleString()}`;
-            if (claimsEl) claimsEl.textContent = `${qm.concurrency_collisions || 14} collisions in window`;
-            if (durEl) durEl.innerHTML = `${(report.execution_time_ms || 146.9).toFixed(1)} <span class="text-xs font-normal text-slate-500">ms</span>`;
+            if (gapEl) gapEl.innerHTML = rca.vulnerability_gap_ms === undefined ? "N/A" : `${Number(rca.vulnerability_gap_ms).toFixed(2)} <span class="text-xs font-normal text-slate-500">ms</span>`;
+            if (minGapEl) minGapEl.textContent = rca.min_observed_gap_ms === undefined ? "Min Gap: N/A" : `Min Gap: ${Number(rca.min_observed_gap_ms).toFixed(2)}ms`;
+            if (dirtyEl) dirtyEl.innerHTML = rca.dirty_read_probability === undefined ? "N/A" : `${Math.round(Number(rca.dirty_read_probability) * 100)}% <span class="text-xs font-normal text-slate-500">ratio</span>`;
+            if (burstTpsEl) burstTpsEl.textContent = qm.tps_in_burst === undefined ? "Burst Velocity: N/A" : `Burst Velocity: ${Number(qm.tps_in_burst).toFixed(1)} tx/s`;
+            if (lossEl) lossEl.textContent = rca.capital_loss_usd === undefined ? "N/A" : `$${Number(rca.capital_loss_usd).toLocaleString()}`;
+            if (claimsEl) claimsEl.textContent = qm.concurrency_collisions === undefined ? "N/A collisions" : `${qm.concurrency_collisions} collisions in window`;
+            if (durEl) durEl.innerHTML = report.execution_time_ms === undefined ? "N/A" : `${Number(report.execution_time_ms).toFixed(1)} <span class="text-xs font-normal text-slate-500">ms</span>`;
 
             // 3. Update Code View
             const codeView = document.getElementById("investigator-code-view");
@@ -7176,7 +7210,7 @@ ${sb.stderr}` : '');
             // 5. Update Chain View
             const chainView = document.getElementById("investigator-chain-view");
             if (chainView && Array.isArray(report.thought_chain)) {
-                chainView.innerHTML = report.thought_chain.map(t => `<div>${t}</div>`).join("");
+                chainView.innerHTML = report.thought_chain.map(t => `<div>${escapeHtml(t)}</div>`).join("");
             }
         }
 
@@ -7295,7 +7329,10 @@ ${sb.stderr}` : '');
                     if (handoffCard) handoffCard.classList.remove("hidden");
                     const rca = data.investigator_data.root_cause_analysis || {};
                     if (handoffSummary) {
-                        handoffSummary.textContent = `Micro Gap: ${(rca.vulnerability_gap_ms || 1.45).toFixed(2)}ms | Dirty Read: ${((rca.dirty_read_probability || 0.933)*100).toFixed(1)}% | Exposure: $${(rca.capital_loss_usd || 7500).toLocaleString()}`;
+                        const handoffGap = rca.vulnerability_gap_ms === undefined ? "N/A" : `${Number(rca.vulnerability_gap_ms).toFixed(2)}ms`;
+                        const handoffDirty = rca.dirty_read_probability === undefined ? "N/A" : `${(Number(rca.dirty_read_probability) * 100).toFixed(1)}%`;
+                        const handoffLoss = rca.capital_loss_usd === undefined ? "N/A" : `$${Number(rca.capital_loss_usd).toLocaleString()}`;
+                        handoffSummary.textContent = `Micro Gap: ${handoffGap} | Dirty Read: ${handoffDirty} | Exposure: ${handoffLoss}`;
                     }
                 } else {
                     if (handoffCard) handoffCard.classList.add("hidden");
@@ -7362,9 +7399,9 @@ ${sb.stderr}` : '');
             const dirtyEl = document.getElementById("wo-kpi-dirty");
             const lossEl = document.getElementById("wo-kpi-loss");
 
-            if (gapEl) gapEl.textContent = `${(qf.vulnerability_gap_ms || 1.45).toFixed(2)}ms`;
-            if (dirtyEl) dirtyEl.textContent = `${qf.dirty_read_rate_pct || 93.3}%`;
-            if (lossEl) lossEl.textContent = `$${(qf.stolen_per_burst_usd || 7500).toLocaleString()}`;
+            if (gapEl) gapEl.textContent = qf.vulnerability_gap_ms === undefined ? "N/A" : `${Number(qf.vulnerability_gap_ms).toFixed(2)}ms`;
+            if (dirtyEl) dirtyEl.textContent = qf.dirty_read_rate_pct === undefined ? "N/A" : `${qf.dirty_read_rate_pct}%`;
+            if (lossEl) lossEl.textContent = qf.stolen_per_burst_usd === undefined ? "N/A" : `$${Number(qf.stolen_per_burst_usd).toLocaleString()}`;
         }
 
         async function deploySecOpsWorkOrder() {

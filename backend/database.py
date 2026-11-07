@@ -1,4 +1,6 @@
+from pathlib import Path
 import os
+import re
 import sqlite3
 import csv
 import time
@@ -6,6 +8,8 @@ from typing import Dict, Any, List, Tuple, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASETS_DIR = os.path.join(BASE_DIR, "datasets")
+UPLOADS_DIR = os.path.join(DATASETS_DIR, "uploads")
+PROJECT_ROOT = Path(BASE_DIR).resolve().parent
 DB_PATH = os.path.join(DATASETS_DIR, "aigis_telemetry.db")
 CSV_PATH = os.path.join(DATASETS_DIR, "aigis_simulated_traffic_1m.csv")
 
@@ -13,31 +17,84 @@ CSV_PATH = os.path.join(DATASETS_DIR, "aigis_simulated_traffic_1m.csv")
 ACTIVE_DB_PATH = DB_PATH
 ACTIVE_DB_NAME = "aigis_telemetry.db"
 
-def get_connection(custom_path: Optional[str] = None) -> sqlite3.Connection:
-    """Tạo kết nối tới SQLite Database với cấu hình tối ưu hiệu năng WAL"""
+
+def _allowed_db_roots() -> List[Path]:
+    return [Path(DATASETS_DIR).resolve(), Path(UPLOADS_DIR).resolve()]
+
+
+def is_allowed_db_path(path: str) -> bool:
+    """Only the bundled datasets directory and uploads directory may be opened."""
+    try:
+        target = Path(path).resolve()
+        return any(target.is_relative_to(root) for root in _allowed_db_roots())
+    except (OSError, ValueError):
+        return False
+
+
+def _has_sqlite_header(path: str) -> bool:
+    try:
+        with open(path, "rb") as f:
+            return f.read(16) == b"SQLite format 3\x00"
+    except OSError:
+        return False
+
+
+def _quote_identifier(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def get_active_db_path() -> str:
+    global ACTIVE_DB_PATH
+    return ACTIVE_DB_PATH
+
+def get_connection(custom_path: Optional[str] = None, read_only: bool = False) -> sqlite3.Connection:
+    """Tạo kết nối tới SQLite Database với cấu hình an toàn, không ép WAL lên file ngoại lai"""
     global ACTIVE_DB_PATH
     target = custom_path or ACTIVE_DB_PATH
-    os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
-    conn = sqlite3.connect(target, timeout=30.0)
+    abs_target = os.path.abspath(target)
+    
+    if read_only:
+        uri = Path(abs_target).as_uri() + "?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only = ON;")
+        return conn
+
+    os.makedirs(os.path.dirname(abs_target), exist_ok=True)
+    conn = sqlite3.connect(abs_target, timeout=30.0)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA synchronous = NORMAL")
-    conn.execute("PRAGMA cache_size = -64000") # 64MB cache
+    
+    # Chỉ bật WAL và cache mở rộng trên database benchmark nội bộ của hệ thống
+    if os.path.abspath(abs_target) == os.path.abspath(DB_PATH):
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+            conn.execute("PRAGMA cache_size = -64000") # 64MB cache
+        except Exception:
+            pass
     return conn
 
 def set_active_db(path: str) -> Dict[str, Any]:
-    """Chuyển đổi kết nối trực tiếp sang một Database SQLite bất kỳ trên máy"""
+    """Chuyển đổi kết nối an toàn với kiểm tra đường dẫn và chống path traversal"""
     global ACTIVE_DB_PATH, ACTIVE_DB_NAME
-    abs_path = os.path.abspath(path.strip().strip('"').strip("'"))
-    if not os.path.exists(abs_path):
-        return {"success": False, "error": f"Database file not found at: {abs_path}"}
+    raw_path = path.strip().strip('"').strip("'")
+    abs_path = os.path.abspath(raw_path)
+    if not os.path.exists(abs_path) or not os.path.isfile(abs_path):
+        return {"success": False, "error": "Database file not found."}
 
+    if not is_allowed_db_path(abs_path):
+        return {"success": False, "error": "Access denied: Only files inside backend/datasets or backend/datasets/uploads may be opened."}
+
+    if not _has_sqlite_header(abs_path):
+        return {"success": False, "error": "File is not a valid SQLite database."}
+
+    conn = None
     try:
-        conn = sqlite3.connect(abs_path)
+        # Mở kiểm tra cấu trúc với mode=ro (Read-Only) để không làm biến đổi file ngoại lai
+        conn = sqlite3.connect(Path(abs_path).as_uri() + "?mode=ro", uri=True, timeout=5.0)
         cur = conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         tables = [r[0] for r in cur.fetchall()]
-        conn.close()
 
         ACTIVE_DB_PATH = abs_path
         ACTIVE_DB_NAME = os.path.basename(abs_path)
@@ -52,8 +109,11 @@ def set_active_db(path: str) -> Dict[str, Any]:
             "size_mb": size_mb,
             "stats": get_db_stats()
         }
-    except Exception as e:
-        return {"success": False, "error": f"File is not a valid SQLite database: {str(e)}"}
+    except Exception:
+        return {"success": False, "error": "File is not a valid SQLite database."}
+    finally:
+        if conn is not None:
+            conn.close()
 
 def get_active_db_info() -> Dict[str, Any]:
     """Lấy thông tin Database hiện hành đang kết nối"""
@@ -70,40 +130,55 @@ def get_active_db_info() -> Dict[str, Any]:
 
 def get_db_tables(custom_path: Optional[str] = None) -> List[str]:
     """Liệt kê danh sách bảng trong Database"""
+    conn = None
     try:
-        conn = get_connection(custom_path)
+        conn = get_connection(custom_path, read_only=True)
         cur = conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-        tables = [r[0] for r in cur.fetchall()]
-        conn.close()
-        return tables
+        return [r[0] for r in cur.fetchall()]
     except Exception:
         return []
+    finally:
+        if conn is not None:
+            conn.close()
 
 def get_table_schema(table_name: str = "telemetry") -> List[Dict[str, Any]]:
     """Lấy cấu trúc metadata các cột của một bảng"""
+    if table_name not in get_db_tables():
+        return []
+    conn = None
     try:
-        conn = get_connection()
+        conn = get_connection(read_only=True)
         cur = conn.cursor()
-        cur.execute(f"PRAGMA table_info({table_name})")
-        cols = [
+        cur.execute(f"PRAGMA table_info({_quote_identifier(table_name)})")
+        return [
             {"cid": r[0], "name": r[1], "type": r[2], "notnull": bool(r[3]), "dflt_value": r[4], "pk": bool(r[5])}
             for r in cur.fetchall()
         ]
-        conn.close()
-        return cols
     except Exception:
         return []
+    finally:
+        if conn is not None:
+            conn.close()
 
-def init_db(force_recreate: bool = False) -> bool:
-    """Khởi tạo cấu trúc bảng Telemetry trong SQLite nếu chưa tồn tại"""
-    if force_recreate and os.path.exists(DB_PATH):
+def init_db(force_recreate: bool = False, target_db_path: Optional[str] = None) -> bool:
+    """Khởi tạo cấu trúc bảng Telemetry trong SQLite tại đúng file đích được chỉ định"""
+    dest_path = os.path.abspath(target_db_path or DB_PATH)
+    if not is_allowed_db_path(dest_path):
+        return False
+    if force_recreate and os.path.exists(dest_path):
+        if dest_path == os.path.abspath(DB_PATH):
+            return False
         try:
-            os.remove(DB_PATH)
+            os.remove(dest_path)
+            for suffix in ("-wal", "-shm", "-journal"):
+                extra = dest_path + suffix
+                if os.path.exists(extra):
+                    os.remove(extra)
         except Exception:
             pass
 
-    conn = get_connection(DB_PATH)
+    conn = get_connection(dest_path)
     cur = conn.cursor()
 
     cur.execute("""
@@ -258,7 +333,7 @@ def init_sentinel_tables(conn: Optional[sqlite3.Connection] = None) -> bool:
                 "2026-11-01 00:00:00",
                 "2026-11-10 23:59:59",
                 1,
-                "Allows up to 50 TPS during promotional flash sale if user entropy > 80% and proxy ratio < 15% (Contextual Stand-Down)."
+                "Allows up to 50 TPS during promotional flash sale if distinct-user ratio >= 70% and datacenter proxy ratio <= 25% (Contextual Stand-Down)."
             ),
             (
                 "RULE_BURST_CEILING",
@@ -376,83 +451,99 @@ def import_custom_csv_to_db(csv_file_path: str, table_name: str = "telemetry", t
     """
     global ACTIVE_DB_PATH, ACTIVE_DB_NAME
     if not os.path.exists(csv_file_path):
-        return {"success": False, "error": f"CSV file not found at {csv_file_path}"}
+        return {"success": False, "error": "CSV file not found."}
 
+    dest_db = os.path.abspath(target_db_path or DB_PATH)
+    if not is_allowed_db_path(dest_db):
+        return {"success": False, "error": "Access denied: target database must be inside backend/datasets or backend/datasets/uploads."}
+
+    safe_table = re_sub(table_name)[:64] or "telemetry"
     t0 = time.time()
-    dest_db = target_db_path or DB_PATH
-    os.makedirs(os.path.dirname(os.path.abspath(dest_db)), exist_ok=True)
+    os.makedirs(os.path.dirname(dest_db), exist_ok=True)
 
-    with open(csv_file_path, "r", encoding="utf-8") as f:
+    with open(csv_file_path, "r", encoding="utf-8", errors="replace") as f:
         reader = csv.reader(f)
         try:
             header = next(reader)
         except StopIteration:
             return {"success": False, "error": "CSV file is empty!"}
 
+    if not header or len(header) > 200:
+        return {"success": False, "error": "CSV header is empty or has too many columns."}
+
     col_count = len(header)
-    is_standard_telemetry = (col_count == 29 and "event_id" in header)
+    is_standard_telemetry = (col_count == 29 and "event_id" in header and safe_table == "telemetry")
 
-    conn = sqlite3.connect(dest_db)
-    cur = conn.cursor()
-    cur.execute("PRAGMA synchronous = OFF")
-    cur.execute("PRAGMA journal_mode = MEMORY")
+    conn = None
+    try:
+        conn = sqlite3.connect(dest_db)
+        cur = conn.cursor()
+        cur.execute("PRAGMA synchronous = OFF")
+        cur.execute("PRAGMA journal_mode = MEMORY")
 
-    if is_standard_telemetry:
-        init_db(force_recreate=(dest_db == DB_PATH))
-    else:
-        # Tạo bảng động cho file CSV tùy chỉnh
-        safe_cols = [re_sub(col.strip()) for col in header]
-        col_defs = ", ".join([f'"{c}" TEXT' for c in safe_cols])
-        cur.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-        cur.execute(f'CREATE TABLE "{table_name}" ({col_defs})')
+        if is_standard_telemetry:
+            cur.execute("DROP TABLE IF EXISTS telemetry")
+            init_db(force_recreate=False, target_db_path=dest_db)
+            insert_table = "telemetry"
+        else:
+            # Tạo bảng động cho file CSV tùy chỉnh
+            safe_cols = [re_sub(col.strip())[:64] or f"col_{idx}" for idx, col in enumerate(header)]
+            col_defs = ", ".join([f'{_quote_identifier(c)} TEXT' for c in safe_cols])
+            cur.execute(f'DROP TABLE IF EXISTS {_quote_identifier(safe_table)}')
+            cur.execute(f'CREATE TABLE {_quote_identifier(safe_table)} ({col_defs})')
+            insert_table = safe_table
 
-    placeholders = ",".join(["?"] * col_count)
-    insert_sql = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
+        placeholders = ",".join(["?"] * col_count)
+        insert_sql = f'INSERT INTO {_quote_identifier(insert_table)} VALUES ({placeholders})'
 
-    total_imported = 0
-    with open(csv_file_path, "r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        next(reader) # skip header
-        batch = []
-        for row in reader:
-            if len(row) == col_count:
-                batch.append(row)
-                if len(batch) >= chunk_size:
-                    cur.executemany(insert_sql, batch)
-                    total_imported += len(batch)
-                    batch.clear()
+        total_imported = 0
+        with open(csv_file_path, "r", encoding="utf-8", errors="replace") as f:
+            reader = csv.reader(f)
+            next(reader)  # skip header
+            batch = []
+            for row in reader:
+                if len(row) == col_count:
+                    batch.append(row)
+                    if len(batch) >= chunk_size:
+                        cur.executemany(insert_sql, batch)
+                        total_imported += len(batch)
+                        batch.clear()
 
-        if batch:
-            cur.executemany(insert_sql, batch)
-            total_imported += len(batch)
-            batch.clear()
+            if batch:
+                cur.executemany(insert_sql, batch)
+                total_imported += len(batch)
+                batch.clear()
 
-    if is_standard_telemetry:
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_is_attack ON telemetry(is_attack)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_attack_type ON telemetry(attack_type)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_burst ON telemetry(burst_stream_id)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_user ON telemetry(user_id)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_epoch ON telemetry(epoch_ms)")
+        if is_standard_telemetry:
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_is_attack ON telemetry(is_attack)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_attack_type ON telemetry(attack_type)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_burst ON telemetry(burst_stream_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_user ON telemetry(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_epoch ON telemetry(epoch_ms)")
 
-    conn.commit()
-    conn.close()
+        conn.commit()
 
-    ACTIVE_DB_PATH = os.path.abspath(dest_db)
-    ACTIVE_DB_NAME = os.path.basename(dest_db)
+        ACTIVE_DB_PATH = dest_db
+        ACTIVE_DB_NAME = os.path.basename(dest_db)
 
-    elapsed = time.time() - t0
-    db_size_mb = round(os.path.getsize(dest_db) / (1024 * 1024), 2) if os.path.exists(dest_db) else 0.0
+        elapsed = time.time() - t0
+        db_size_mb = round(os.path.getsize(dest_db) / (1024 * 1024), 2) if os.path.exists(dest_db) else 0.0
 
-    return {
-        "success": True,
-        "rows_imported": total_imported,
-        "table_name": table_name,
-        "columns": header,
-        "time_taken_sec": round(elapsed, 2),
-        "db_size_mb": db_size_mb,
-        "db_path": ACTIVE_DB_PATH,
-        "db_name": ACTIVE_DB_NAME
-    }
+        return {
+            "success": True,
+            "rows_imported": total_imported,
+            "table_name": insert_table,
+            "columns": header,
+            "time_taken_sec": round(elapsed, 2),
+            "db_size_mb": db_size_mb,
+            "db_path": ACTIVE_DB_PATH,
+            "db_name": ACTIVE_DB_NAME
+        }
+    except Exception:
+        return {"success": False, "error": "Failed to import CSV into SQLite."}
+    finally:
+        if conn is not None:
+            conn.close()
 
 def re_sub(val: str) -> str:
     """Loại bỏ ký tự đặc biệt khỏi tên cột SQL"""
@@ -466,13 +557,12 @@ def get_db_stats() -> Dict[str, Any]:
     if not os.path.exists(ACTIVE_DB_PATH):
         return {"connected": False, "total_rows": 0, "status": "DATABASE_NOT_CREATED"}
 
-    conn = get_connection()
-    cur = conn.cursor()
-
+    conn = None
     try:
+        conn = get_connection(read_only=True)
+        cur = conn.cursor()
         tables = get_db_tables()
         if not tables:
-            conn.close()
             return {"connected": True, "total_rows": 0, "status": "DATABASE_EMPTY", "db_name": ACTIVE_DB_NAME}
 
         # Nếu có bảng telemetry, chạy thống kê chuyên sâu
@@ -481,7 +571,6 @@ def get_db_stats() -> Dict[str, Any]:
             total_rows = cur.fetchone()[0]
 
             if total_rows == 0:
-                conn.close()
                 return {"connected": True, "total_rows": 0, "status": "DATABASE_EMPTY", "db_name": ACTIVE_DB_NAME}
 
             cur.execute("SELECT COUNT(*) FROM telemetry WHERE is_attack = 0")
@@ -503,7 +592,6 @@ def get_db_stats() -> Dict[str, Any]:
             unique_users = cur.fetchone()[0]
 
             db_size_mb = round(os.path.getsize(ACTIVE_DB_PATH) / (1024 * 1024), 2)
-            conn.close()
 
             return {
                 "connected": True,
@@ -523,10 +611,9 @@ def get_db_stats() -> Dict[str, Any]:
 
         # Nếu là database tùy chỉnh khác
         primary_table = tables[0]
-        cur.execute(f'SELECT COUNT(*) FROM "{primary_table}"')
+        cur.execute(f'SELECT COUNT(*) FROM {_quote_identifier(primary_table)}')
         total_rows = cur.fetchone()[0]
         db_size_mb = round(os.path.getsize(ACTIVE_DB_PATH) / (1024 * 1024), 2)
-        conn.close()
 
         return {
             "connected": True,
@@ -544,9 +631,11 @@ def get_db_stats() -> Dict[str, Any]:
             "tables": tables,
             "primary_table": primary_table
         }
-    except Exception as e:
-        conn.close()
-        return {"connected": False, "error": str(e), "total_rows": 0, "db_name": ACTIVE_DB_NAME}
+    except Exception:
+        return {"connected": False, "error": "Unable to read database statistics.", "total_rows": 0, "db_name": ACTIVE_DB_NAME}
+    finally:
+        if conn is not None:
+            conn.close()
 
 def query_telemetry_rows(limit: int = 20, offset: int = 0, filter_type: str = "all") -> List[Dict[str, Any]]:
     """Truy vấn các dòng dữ liệu với filter và pagination trực tiếp qua SQL"""
@@ -559,28 +648,26 @@ def query_telemetry_rows(limit: int = 20, offset: int = 0, filter_type: str = "a
         return []
 
     table_name = "telemetry" if "telemetry" in tables else tables[0]
-    conn = get_connection()
-    cur = conn.cursor()
+    limit = min(max(1, int(limit)), 500)
+    offset = max(0, int(offset))
+    conn = None
 
     try:
+        conn = get_connection(read_only=True)
+        cur = conn.cursor()
         if table_name == "telemetry":
             if filter_type == "attack":
                 sql = "SELECT * FROM telemetry WHERE is_attack = 1 ORDER BY epoch_ms DESC LIMIT ? OFFSET ?"
-                params = (limit, offset)
             elif filter_type == "benign":
                 sql = "SELECT * FROM telemetry WHERE is_attack = 0 ORDER BY epoch_ms DESC LIMIT ? OFFSET ?"
-                params = (limit, offset)
             else:
                 sql = "SELECT * FROM telemetry ORDER BY epoch_ms DESC LIMIT ? OFFSET ?"
-                params = (limit, offset)
         else:
-            sql = f'SELECT * FROM "{table_name}" LIMIT ? OFFSET ?'
-            params = (limit, offset)
+            sql = f'SELECT * FROM {_quote_identifier(table_name)} LIMIT ? OFFSET ?'
 
-        cur.execute(sql, params)
+        cur.execute(sql, (limit, offset))
         raw_rows = [dict(row) for row in cur.fetchall()]
-        conn.close()
-        
+
         # Tự động gắn nhãn AI Classification cho từng dòng dữ liệu
         try:
             from .traffic_classifier import classify_traffic_row
@@ -595,37 +682,64 @@ def query_telemetry_rows(limit: int = 20, offset: int = 0, filter_type: str = "a
                 r["ai_classification"] = classify_traffic_row(r)
         return raw_rows
     except Exception:
-        conn.close()
         return []
+    finally:
+        if conn is not None:
+            conn.close()
 
 def execute_raw_sql(sql_query: str, max_limit: int = 50) -> Dict[str, Any]:
     """
-    Thực thi câu lệnh SQL SELECT an toàn từ giao diện người dùng (Interactive SQL Console & Text-to-SQL).
-    Chỉ cho phép các lệnh đọc (SELECT, EXPLAIN, PRAGMA, WITH).
+    Thực thi câu lệnh SQL thuần Read-Only an toàn tuyệt đối với SQLite Authorizer,
+    PRAGMA query_only=ON, cấm triệt để lệnh ghi và chặn đệ quy vô hạn (runaway CTE DoS).
     """
     global ACTIVE_DB_PATH
-    clean_sql = sql_query.strip()
-    first_word = clean_sql.split()[0].upper() if clean_sql else ""
+    clean_sql = sql_query.strip().rstrip(';')
+    if not clean_sql:
+        return {"success": False, "error": "Query cannot be empty."}
 
-    if first_word not in ("SELECT", "EXPLAIN", "PRAGMA", "WITH"):
+    # Bỏ chú thích ở đầu để xác định keyword đầu tiên, không sửa nội dung câu lệnh.
+    cleaned = re.sub(r'--.*?\n', '\n', clean_sql)
+    cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL).strip()
+    first_word = cleaned.split()[0].upper() if cleaned else ""
+    if first_word not in ("SELECT", "WITH", "EXPLAIN"):
         return {
             "success": False,
             "error": "Security Restriction: Only read-only queries (SELECT, WITH, EXPLAIN) are permitted."
         }
 
     if not os.path.exists(ACTIVE_DB_PATH):
-        return {"success": False, "error": f"Database file does not exist at {ACTIVE_DB_PATH}. Please import first."}
+        return {"success": False, "error": "Database file does not exist. Please import a dataset first."}
 
+    max_limit = min(max(1, max_limit), 100)
     t0 = time.time()
-    conn = get_connection()
-    cur = conn.cursor()
+    conn = None
 
     try:
+        # Mở kết nối chuyên dụng với URI mode=ro (Read-Only)
+        conn = sqlite3.connect(Path(os.path.abspath(ACTIVE_DB_PATH)).as_uri() + "?mode=ro", uri=True, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only = ON;")
+
+        # Đăng ký Authorizer chỉ cho phép đọc, cấm mọi thao tác ghi
+        def authorizer(action, arg1, arg2, db_name, trigger_name):
+            if action in (sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION, sqlite3.SQLITE_RECURSIVE):
+                if action == sqlite3.SQLITE_FUNCTION and arg2 and str(arg2).lower() in ("load_extension", "readfile", "writefile"):
+                    return sqlite3.SQLITE_DENY
+                return sqlite3.SQLITE_OK
+            return sqlite3.SQLITE_DENY
+        conn.set_authorizer(authorizer)
+
+        # Progress handler giới hạn thời gian thực thi để chống đệ quy vô tận.
+        deadline = time.monotonic() + 10.0
+        def progress_handler():
+            return 1 if time.monotonic() > deadline else 0
+        conn.set_progress_handler(progress_handler, 10_000)
+
+        cur = conn.cursor()
         cur.execute(clean_sql)
         columns = [desc[0] for desc in cur.description] if cur.description else []
         rows = [list(r) for r in cur.fetchmany(max_limit)]
         elapsed = time.time() - t0
-        conn.close()
         return {
             "success": True,
             "columns": columns,
@@ -635,8 +749,13 @@ def execute_raw_sql(sql_query: str, max_limit: int = 50) -> Dict[str, Any]:
             "sql_query": clean_sql
         }
     except Exception as e:
-        conn.close()
-        return {"success": False, "error": str(e), "sql_query": clean_sql}
+        err_msg = str(e)
+        if "interrupted" in err_msg.lower() or "abort" in err_msg.lower():
+            err_msg = "Query execution timed out or exceeded complexity limit (runaway recursive CTE blocked)."
+        return {"success": False, "error": err_msg, "sql_query": clean_sql}
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def list_uploaded_databases() -> List[Dict[str, Any]]:
@@ -691,6 +810,15 @@ def delete_uploaded_database(filename: Optional[str] = None) -> Dict[str, Any]:
     if os.path.abspath(target_file) == os.path.abspath(DB_PATH):
         return {"success": False, "error": "Protected file: Cannot delete default 'aigis_telemetry.db'."}
 
+    # Chống Path Traversal: Chỉ cho phép xóa các file nằm trong thư mục uploads
+    try:
+        target_p = Path(target_file).resolve()
+        upload_dir_p = Path(upload_dir).resolve()
+        if not target_p.is_relative_to(upload_dir_p):
+            return {"success": False, "error": "Access denied: Cannot delete files outside the authorized uploads directory."}
+    except Exception as pe:
+        return {"success": False, "error": f"Path validation error: {str(pe)}"}
+
     deleted_name = os.path.basename(target_file)
 
     # Nếu file đang xóa chính là DB đang active, chuyển active về DB_PATH trước
@@ -710,7 +838,7 @@ def delete_uploaded_database(filename: Optional[str] = None) -> Dict[str, Any]:
                     os.remove(extra_file)
                 except Exception:
                     pass
-            
+
         return {
             "success": True,
             "deleted_file": deleted_name,
@@ -720,8 +848,8 @@ def delete_uploaded_database(filename: Optional[str] = None) -> Dict[str, Any]:
             "active_db_path": ACTIVE_DB_PATH,
             "message": f"Successfully deleted '{deleted_name}'. Active database is now '{ACTIVE_DB_NAME}'."
         }
-    except Exception as e:
-        return {"success": False, "error": f"Failed to delete file '{deleted_name}': {str(e)}"}
+    except Exception:
+        return {"success": False, "error": f"Failed to delete file '{deleted_name}'."}
 
 
 # ==============================================================================
@@ -1025,12 +1153,14 @@ def query_table_data(table_name: str = "telemetry", limit: int = 15, offset: int
     if table_name not in tables:
         table_name = "telemetry" if "telemetry" in tables else tables[0]
 
-    conn = get_connection()
+    limit = min(max(1, int(limit)), 200)
+    offset = max(0, int(offset))
+    conn = get_connection(read_only=True)
     cur = conn.cursor()
 
     try:
         # Schema columns
-        cur.execute(f'PRAGMA table_info("{table_name}")')
+        cur.execute(f'PRAGMA table_info({_quote_identifier(table_name)})')
         cols_info = cur.fetchall()
         columns = [
             {"name": c[1], "type": c[2], "pk": bool(c[5])}

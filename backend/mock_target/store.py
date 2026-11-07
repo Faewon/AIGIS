@@ -13,7 +13,10 @@ class VulnerableVoucherStore:
     def __init__(self):
         self.reset()
 
-    def reset(self):
+    def reset(self, preserve_patches: bool = False):
+        patch_enabled = getattr(self, "patch_enabled", False)
+        patch_modules = dict(getattr(self, "patch_modules", {}))
+
         self.budget_remaining: float = 200000.0  # Ngân sách $200,000
         self.user_claims: Dict[str, int] = {}    # user_id -> số lần đã nhận
         self.vouchers_issued: List[Dict[str, Any]] = []
@@ -44,6 +47,10 @@ class VulnerableVoucherStore:
 
         self.distributed_lock: Dict[str, float] = {}
 
+        if preserve_patches:
+            self.patch_enabled = patch_enabled
+            self.patch_modules = patch_modules
+
     def set_all_patches(self, enabled: bool):
         self.patch_enabled = enabled
         for k in self.patch_modules:
@@ -53,8 +60,7 @@ class VulnerableVoucherStore:
     # 1. TOCTOU RACE CONDITION ENDPOINT
     # =========================================================================
     async def claim_voucher(self, user_id: str, voucher_code: str, amount: float = 500.0) -> Dict[str, Any]:
-        timestamp = time.time()
-
+        lock_key = None
         if self.patch_enabled or self.patch_modules.get("concurrency_mutex"):
             lock_key = f"lock:claim:{user_id}"
             now = time.time()
@@ -67,7 +73,14 @@ class VulnerableVoucherStore:
                     "blocked_by": "Aegis_Blue_Team_Patch"
                 }
             self.distributed_lock[lock_key] = now
+        try:
+            return await self._claim_voucher_unlocked(user_id, voucher_code, amount)
+        finally:
+            if lock_key is not None:
+                self.distributed_lock.pop(lock_key, None)
 
+    async def _claim_voucher_unlocked(self, user_id: str, voucher_code: str, amount: float) -> Dict[str, Any]:
+        timestamp = time.time()
         current_claims = self.user_claims.get(user_id, 0)
         if current_claims >= 1:
             return {
@@ -77,7 +90,23 @@ class VulnerableVoucherStore:
                 "user_id": user_id
             }
 
+        if self.budget_remaining < amount:
+            return {
+                "success": False,
+                "status_code": 400,
+                "error": "Campaign budget exhausted.",
+                "user_id": user_id
+            }
+
         await asyncio.sleep(0.02) # Network I/O gap
+
+        if self.budget_remaining < amount:
+            return {
+                "success": False,
+                "status_code": 400,
+                "error": "Campaign budget exhausted.",
+                "user_id": user_id
+            }
 
         self.user_claims[user_id] = current_claims + 1
         self.budget_remaining -= amount

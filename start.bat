@@ -7,13 +7,13 @@ echo  Adversarial Intelligence for Generative Immunity ^& Security
 echo =====================================================================
 echo.
 echo [1/2] Dang kiem tra moi truong Python...
-python -c "import fastapi, uvicorn, multipart" 2>nul
+python -c "import fastapi, uvicorn, multipart, httpx" 2>nul
 if %errorlevel% neq 0 (
     echo [!] Dang cai dat thu vien phu thuoc...
-    pip install fastapi uvicorn python-multipart
+    pip install -r requirements.txt
 )
 
 echo.
-echo [2/2] Khoi dong Server tai http://localhost:8000 ...
+echo [2/2] Khoi dong Server tai http://127.0.0.1:8000 ...
 python run_server.py
 pause

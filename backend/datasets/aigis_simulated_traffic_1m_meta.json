@@ -9,8 +9,10 @@
   },
   "unpatched_total_drained_usd": 132930000.0,
   "patched_total_saved_usd": 124068000.0,
-  "csv_path": "D:\\Vscode Projects\\aigis\\backend\\datasets\\aigis_simulated_traffic_1m.csv",
-  "meta_path": "D:\\Vscode Projects\\aigis\\backend\\datasets\\aigis_simulated_traffic_1m_meta.json",
+  "csv_path": "backend/datasets/aigis_simulated_traffic_1m.csv",
+  "meta_path": "backend/datasets/aigis_simulated_traffic_1m_meta.json",
+  "attack_ratio_param_per_batch": 0.035,
+  "attack_row_pct": 30.86,
   "generation_time_sec": 8.44,
   "file_size_mb": 381.07,
   "sample_preview": [

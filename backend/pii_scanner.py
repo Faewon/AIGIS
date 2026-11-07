@@ -27,12 +27,17 @@ class SensitiveDataScanner:
     """
 
     PATTERNS = {
-        "CREDIT_CARD_PAN": r'\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b',
-        "VIETNAM_CCCD_ID": r'\b(0[0-9]{11}|[0-9]{9})\b',
+        # 13-19 digits, optionally separated by single spaces or dashes; Luhn-validated below.
+        "CREDIT_CARD_PAN": r'(?<![\d-])\d(?:[ -]?\d){12,18}(?![\d-])',
+        # Vietnam CCCD: 12 digits starting with a 3-digit province code (001-096).
+        "VIETNAM_CCCD_ID": r'(?<!\d)0(?:0[1-9]|[1-8]\d|9[0-6])\d{9}(?!\d)',
         "JWT_SECRET_TOKEN": r'\beyJ[a-zA-Z0-9_\-]{15,}\.[a-zA-Z0-9_\-]{15,}\.[a-zA-Z0-9_\-]{15,}\b',
-        "API_SECRET_KEY": r'\b(?:sk_live_[a-zA-Z0-9]{24}|AIzaSy[a-zA-Z0-9_\-]{33}|ghp_[a-zA-Z0-9]{36})\b',
+        "API_SECRET_KEY": r'\b(?:sk_live_[a-zA-Z0-9]{24,}|sk-[A-Za-z0-9_\-]{20,}|AIza[0-9A-Za-z_\-]{35}|ghp_[a-zA-Z0-9]{36}|gsk_[A-Za-z0-9]{20,})\b',
         "PHONE_NUMBER_VN": r'\b(?:09|08|03|07|05)[0-9]{8}\b'
     }
+
+    # Card brand prefixes (Visa, Mastercard incl. 2-series, Amex, Discover, JCB, UnionPay).
+    _CARD_PREFIX = re.compile(r'^(?:4|5[1-5]|2[2-7]|3[47]|6(?:011|5)|35|62)')
 
     @classmethod
     def scan_content(cls, content: str) -> Dict[str, Any]:
@@ -40,12 +45,12 @@ class SensitiveDataScanner:
         masked_content = content
 
         # 1. Credit Card Check
-        cc_matches = re.finditer(cls.PATTERNS["CREDIT_CARD_PAN"], content)
-        for m in cc_matches:
-            card = m.group(0)
-            if check_luhn(card):
+        for m in re.finditer(cls.PATTERNS["CREDIT_CARD_PAN"], content):
+            raw = m.group(0)
+            card = re.sub(r'[ -]', '', raw)
+            if cls._CARD_PREFIX.match(card) and check_luhn(card):
                 masked = f"{card[:4]}-XXXX-XXXX-{card[-4:]}"
-                masked_content = masked_content.replace(card, masked)
+                masked_content = masked_content.replace(raw, masked)
                 findings.append({
                     "type": "PAYMENT_CARD_PAN_EXPOSURE",
                     "severity": "CRITICAL",
@@ -55,20 +60,17 @@ class SensitiveDataScanner:
                 })
 
         # 2. National ID (CCCD) Check
-        cccd_matches = re.finditer(cls.PATTERNS["VIETNAM_CCCD_ID"], content)
-        for m in cccd_matches:
+        for m in re.finditer(cls.PATTERNS["VIETNAM_CCCD_ID"], content):
             cid = m.group(0)
-            # Avoid matching pure timestamp digits by checking context
-            if len(cid) == 12 and (cid.startswith("0") or "id" in content.lower()):
-                masked = f"{cid[:3]}XXXXXX{cid[-3:]}"
-                masked_content = masked_content.replace(cid, masked)
-                findings.append({
-                    "type": "NATIONAL_ID_EXPOSURE",
-                    "severity": "HIGH",
-                    "compliance_violation": "Decree 13/2023/ND-CP & SBV Circular 09",
-                    "matched": f"{cid[:3]}...{cid[-3:]}",
-                    "masked": masked
-                })
+            masked = f"{cid[:3]}XXXXXX{cid[-3:]}"
+            masked_content = masked_content.replace(cid, masked)
+            findings.append({
+                "type": "NATIONAL_ID_EXPOSURE",
+                "severity": "HIGH",
+                "compliance_violation": "Decree 13/2023/ND-CP & SBV Circular 09",
+                "matched": f"{cid[:3]}...{cid[-3:]}",
+                "masked": masked
+            })
 
         # 3. JWT & Secrets Check
         jwt_matches = re.finditer(cls.PATTERNS["JWT_SECRET_TOKEN"], content)
@@ -81,6 +83,19 @@ class SensitiveDataScanner:
                 "severity": "CRITICAL",
                 "compliance_violation": "OWASP API2:2023 Broken Authentication",
                 "matched": jwt[:15] + "...",
+                "masked": masked
+            })
+
+        # 4. API Secret Keys
+        for m in re.finditer(cls.PATTERNS["API_SECRET_KEY"], content):
+            key = m.group(0)
+            masked = f"{key[:6]}...[REDACTED_API_KEY]"
+            masked_content = masked_content.replace(key, masked)
+            findings.append({
+                "type": "API_SECRET_KEY_LEAK",
+                "severity": "CRITICAL",
+                "compliance_violation": "OWASP API8:2023 Security Misconfiguration",
+                "matched": key[:6] + "...",
                 "masked": masked
             })
 
@@ -98,10 +113,15 @@ class SensitiveDataScanner:
             data = json.loads(raw_text)
             paths = data.get("paths", {})
             extracted_endpoints = []
+            global_security = data.get("security")
             for path, methods in paths.items():
                 for method, spec in methods.items():
                     if method.upper() in ["GET", "POST", "PUT", "DELETE", "PATCH"]:
-                        has_auth = "security" in spec or "security" in data
+                        # Operation-level `security` overrides the global one; an empty
+                        # list (`security: []`) explicitly marks the operation public.
+                        effective = spec["security"] if "security" in spec else global_security
+                        # A `{}` entry means anonymous access is also allowed.
+                        has_auth = bool(effective) and all(bool(req) for req in effective)
                         extracted_endpoints.append({
                             "path": path,
                             "method": method.upper(),

@@ -10,7 +10,13 @@ Directly adapted from ARIA's Operator Q&A Architecture:
 
 import time
 import json
+import re
 from typing import Dict, Any, List, Optional
+
+
+def _has_intent(text: str, keywords: List[str]) -> bool:
+    """Whole-word/phrase match so short keys ("rca", "kb", "past") don't fire inside other words."""
+    return any(re.search(r"(?<!\w)" + re.escape(k) + r"(?!\w)", text) for k in keywords)
 
 try:
     from ..database import get_connection, get_incident_memory, get_policy_rules, DB_PATH
@@ -59,7 +65,7 @@ class SecOpsCopilotAgent:
         reply = ""
 
         # 1. INTENT: Deep Anomaly Diagnosis / TOCTOU Investigation (Triggers Handoff)
-        if any(k in q for k in ["chẩn đoán", "chan doan", "điều tra", "dieu tra", "investigate", "investigation", "rca", "gốc rễ", "goc re", "toctou", "race condition", "xung đột", "xung dot", "dirty read", "diagnose", "diagnosis", "root cause", "exploit"]):
+        if _has_intent(q, ["chẩn đoán", "chan doan", "điều tra", "dieu tra", "investigate", "investigation", "rca", "gốc rễ", "goc re", "toctou", "race condition", "xung đột", "xung dot", "dirty read", "diagnose", "diagnosis", "root cause", "exploit"]):
             handoff_invoked = True
             inv_report = await global_quant_investigator.diagnose_anomaly(target_endpoint="/api/v1/voucher/claim")
             investigator_data = inv_report
@@ -83,7 +89,7 @@ class SecOpsCopilotAgent:
             ]
 
         # 2. INTENT: Sentinel Status & System Health
-        elif any(k in q for k in ["tấn công", "tan cong", "sentinel", "trạng thái", "trang thai", "sức khỏe", "suc khoe", "health", "drift", "bình thường", "binh thuong", "attack", "status", "normal", "under attack", "posture"]):
+        elif _has_intent(q, ["tấn công", "tan cong", "sentinel", "trạng thái", "trang thai", "sức khỏe", "suc khoe", "health", "drift", "bình thường", "binh thuong", "attack", "status", "normal", "under attack", "posture"]):
             sent_status = global_fintech_sentinel.get_status().get("current_state", {})
             verdict = sent_status.get("verdict", "NORMAL")
             tps = sent_status.get("tps", 10.0)
@@ -117,7 +123,7 @@ class SecOpsCopilotAgent:
             ]
 
         # 3. INTENT: Incident Memory & Past Failures
-        elif any(k in q for k in ["sự cố", "su co", "quá khứ", "qua khu", "lịch sử", "lich su", "incident", "memory", "kb", "cve", "history", "past"]):
+        elif _has_intent(q, ["sự cố", "su co", "quá khứ", "qua khu", "lịch sử", "lich su", "incident", "memory", "kb", "cve", "history", "past"]):
             incidents = get_incident_memory(limit=5)
             inc_lines = []
             for inc in incidents:
@@ -138,7 +144,7 @@ class SecOpsCopilotAgent:
             ]
 
         # 4. INTENT: Policy Rules / Flash Sale
-        elif any(k in q for k in ["chính sách", "chinh sach", "quy tắc", "quy tac", "flash sale", "khuyến mãi", "khuyen mai", "policy", "policies", "rule", "rules", "stand-down"]):
+        elif _has_intent(q, ["chính sách", "chinh sach", "quy tắc", "quy tac", "flash sale", "khuyến mãi", "khuyen mai", "policy", "policies", "rule", "rules", "stand-down"]):
             policies = get_policy_rules()
             pol_lines = []
             for p in policies:
@@ -159,7 +165,7 @@ class SecOpsCopilotAgent:
             ]
 
         # 5. INTENT: Work Order Generation
-        elif any(k in q for k in ["work order", "phiếu", "phieu", "khắc phục", "khac phuc", "canary", "rollout", "lệnh sửa", "lenh sua", "remediation", "patch"]):
+        elif _has_intent(q, ["work order", "phiếu", "phieu", "khắc phục", "khac phuc", "canary", "rollout", "lệnh sửa", "lenh sua", "remediation", "patch"]):
             reply = (
                 f"**SecOps Technical Intervention Work Order:**\n\n"
                 f"- **Work Order ID**: `WO-2026-0814` (Priority: `P0_CRITICAL`)\n"

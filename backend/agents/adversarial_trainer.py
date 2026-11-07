@@ -27,221 +27,137 @@ class AdversarialTrainer:
 
     async def train_adversarial_rounds(self, total_rounds: int = 5, burst_streams: int = 15) -> Dict[str, Any]:
         """
-        Chạy chu trình huấn luyện đối kháng đa vòng chuyên sâu (Deep Adversarial Co-Evolution).
-        Mỗi vòng Red Team tự động biến đổi chiến thuật và Blue Team nâng cấp lớp phòng vệ tương ứng.
+        Run measured attack/retest rounds against the in-process mock target.
+        Scenario labels are illustrative; all loss and mitigation values come from
+        the actual mock-store responses.
         """
         t0 = time.time()
+        total_rounds = max(1, min(int(total_rounds), 20))
+        burst_streams = max(2, min(int(burst_streams), 100))
         mock_store.reset()
         llm_status = global_llm_engine.get_status()
 
-        # Bước 1: REA Reconnaissance ban đầu
         rea_report = await self.rea_agent.analyze_target("app.bundle.js")
 
-        rounds_history = []
-        base_scoring = self.arbiter_agent.compute_quantified_security_score(
-            attack_report={"total_burst_count": burst_streams, "total_stolen_amount": 7500.0, "illegal_claims_count": burst_streams - 1}
-        )
-        current_score = base_scoring["initial_score"]
-        red_elo = 1200
-        blue_elo = 1150
-
-        # Danh mục 7 vòng tiến hóa đối kháng thực nghiệm chuyên sâu
         round_templates = [
-            {
-                "round": 1,
-                "title": "Round 1: Baseline Single-Packet Race Exploitation",
-                "red_tactic": "HTTP/2_SINGLE_PACKET_BURST",
-                "red_desc": f"Direct single-packet concurrency burst with {burst_streams} streams targeting TOCTOU window on /api/v1/voucher/claim using identical user identity.",
-                "blue_tactic": "PER_USER_REDIS_MUTEX_LOCK",
-                "blue_desc": "Synthesized Level 1 Distributed Mutex Lock: Atomic SETNX on user_id key to serialize incoming transaction requests.",
-                "target_loss": 7500.0,
-                "simulated_stolen_before": 7500.0,
-                "retest_stolen_after": 500.0,
-                "mitigation_rate": 93.3,
-                "score_target": 76.5,
-                "red_elo_delta": -40,
-                "blue_elo_delta": +120
-            },
-            {
-                "round": 2,
-                "title": "Round 2: Sybil Swarm & Sub-Millisecond Timing Jitter Mutation",
-                "red_tactic": "DISTRIBUTED_SYBIL_SWARM_MUTATION",
-                "red_desc": "Red mutates attack strategy: Deploys 30 multi-identity Sybil bot accounts with randomized user IDs, rotating X-Forwarded-For IPs, and 0.2ms micro-jitter to evade single-user lock.",
-                "blue_tactic": "ADAPTIVE_TOKEN_BUCKET_AND_JA3_THROTTLE",
-                "blue_desc": "Synthesized Level 2 Adaptive Defense: Global Sliding-Window Token Bucket + JA3 TLS Fingerprint cluster throttling + IP subnet velocity limit.",
-                "target_loss": 6000.0,
-                "simulated_stolen_before": 6000.0,
-                "retest_stolen_after": 200.0,
-                "mitigation_rate": 96.7,
-                "score_target": 88.5,
-                "red_elo_delta": +60,
-                "blue_elo_delta": +150
-            },
-            {
-                "round": 3,
-                "title": "Round 3: Shadow API Bypass & State Inversion Attack",
-                "red_tactic": "SHADOW_ROUTE_INJECTION_AND_ASYNC_RACE",
-                "red_desc": "Red probes undocumented shadow endpoint (/api/v1/checkout/direct_confirm) discovered in JS bundle with payload mutation to bypass voucher verification step.",
-                "blue_tactic": "STATE_MACHINE_INVARIANT_GATEKEEPER",
-                "blue_desc": "Synthesized Level 3 Hardened Defense: Formal State Machine Invariant Validator (enforcing strict S1->S2->S3->S4 order) + Cryptographic Idempotency Nonce.",
-                "target_loss": 3500.0,
-                "simulated_stolen_before": 3500.0,
-                "retest_stolen_after": 0.0,
-                "mitigation_rate": 100.0,
-                "score_target": 93.2,
-                "red_elo_delta": -80,
-                "blue_elo_delta": +170
-            },
-            {
-                "round": 4,
-                "title": "Round 4: HTTP/2 Rapid-Reset & Multiplex Frame Desync",
-                "red_tactic": "HTTP2_RAPID_RESET_FRAME_DESYNC",
-                "red_desc": "Red transmits stream cancellation RST_STREAM frame bursts immediately after request dispatch to exhaust gateway reverse-proxy buffers while maintaining worker execution.",
-                "blue_tactic": "ASYNC_STREAM_LIFECYCLE_GUARD_AND_FRAME_THROTTLE",
-                "blue_desc": "Synthesized Level 4 Transport Guard: Fast-cancellation ASGI worker interceptor and multiplexed frame quota enforcement (< 50 resets/sec).",
-                "target_loss": 2000.0,
-                "simulated_stolen_before": 2000.0,
-                "retest_stolen_after": 0.0,
-                "mitigation_rate": 100.0,
-                "score_target": 96.0,
-                "red_elo_delta": +40,
-                "blue_elo_delta": +190
-            },
-            {
-                "round": 5,
-                "title": "Round 5: Split-Brain & Redis Failover Partition Race",
-                "red_tactic": "SENTINEL_FAILOVER_WINDOW_EXPLOITATION",
-                "red_desc": "Red injects sub-millisecond micro-bursts during simulated Redis sentinel failover (10ms partition gap) attempting to acquire orphaned lock releases.",
-                "blue_tactic": "REDLOCK_CONSENSUS_AND_DB_ROW_PESSIMISTIC_MUTEX",
-                "blue_desc": "Synthesized Level 5 Resilient Consensus: Redlock multi-node quorum consensus + relational DB row-level pessimistic lock (SELECT FOR UPDATE) fallback barrier.",
-                "target_loss": 1500.0,
-                "simulated_stolen_before": 1500.0,
-                "retest_stolen_after": 0.0,
-                "mitigation_rate": 100.0,
-                "score_target": 98.2,
-                "red_elo_delta": -90,
-                "blue_elo_delta": +210
-            },
-            {
-                "round": 6,
-                "title": "Round 6: Polymorphic Payload & Microsecond Timing Side-Channel Probing",
-                "red_tactic": "STATISTICAL_TIMING_CHANNEL_ANALYSIS",
-                "red_desc": "Red measures 10-microsecond differential response timing to reconstruct valid idempotency token hashes and infer backend lock expiration bounds.",
-                "blue_tactic": "CONSTANT_TIME_NONCE_HMAC_AND_EXPONENTIAL_BACKOFF",
-                "blue_desc": "Synthesized Level 6 Cryptographic Hardening: Constant-time HMAC-SHA256 token verification with cryptographically random jitter padding (1.0ms ± 0.2ms).",
-                "target_loss": 800.0,
-                "simulated_stolen_before": 800.0,
-                "retest_stolen_after": 0.0,
-                "mitigation_rate": 100.0,
-                "score_target": 99.2,
-                "red_elo_delta": +20,
-                "blue_elo_delta": +220
-            },
-            {
-                "round": 7,
-                "title": "Round 7: Autonomous Nash Equilibrium & Formal Verification Proof",
-                "red_tactic": "GENETIC_HYPER_FUZZING_EXHAUSTION",
-                "red_desc": "Red launches automated genetic algorithm fuzzing across 10,000 mutated permutations across all routes, tokens, and concurrency vectors simultaneously.",
-                "blue_tactic": "DEFENSE_IN_DEPTH_SHIELD_WITH_FORMAL_INVARIANTS",
-                "blue_desc": "Synthesized Level 7 Enterprise Shield: Multi-tier defense-in-depth validated with formal state invariant mathematical proof. All attack surfaces neutralized.",
-                "target_loss": 500.0,
-                "simulated_stolen_before": 500.0,
-                "retest_stolen_after": 0.0,
-                "mitigation_rate": 100.0,
-                "score_target": 99.8,
-                "red_elo_delta": -120,
-                "blue_elo_delta": +250
-            }
+            ("TOCTOU_RACE_CONDITION", "Baseline concurrent voucher-claim burst", "PER_USER_MUTEX_LOCK"),
+            ("BOLA_IDOR", "Object-level authorization probe against victim accounts", "OBJECT_OWNERSHIP_GUARD"),
+            ("STEP_SKIPPING_STATE_BYPASS", "Order state-machine transition bypass", "STATE_MACHINE_INVARIANT_GUARD"),
+            ("NEGATIVE_AMOUNT_TAMPERING", "Negative amount and discount parameter tampering", "BOUNDS_VALIDATION_GUARD"),
+            ("TOCTOU_RACE_CONDITION", "Larger concurrent voucher-claim burst", "ADAPTIVE_VELOCITY_AND_LOCK_GUARD"),
         ]
 
-        # Mở rộng nếu người dùng chọn > 7 vòng (ví dụ 10 vòng)
-        active_rounds_config = round_templates[:min(total_rounds, len(round_templates))]
-        if total_rounds > len(round_templates):
-            for extra_r in range(len(round_templates) + 1, total_rounds + 1):
-                active_rounds_config.append({
-                    "round": extra_r,
-                    "title": f"Round {extra_r}: Continuous Chaos & Zero-Day Fuzzing Convergence",
-                    "red_tactic": f"CHAOS_ZERO_DAY_MUTATION_R{extra_r}",
-                    "red_desc": f"Continuous adversarial genetic fuzzer testing mutated protocol permutations, leap-second drifts, and distributed edge cases.",
-                    "blue_tactic": f"AUTONOMOUS_ENTERPRISE_IMMUNITY_R{extra_r}",
-                    "blue_desc": f"Continuous heuristic adaptation: Zero-regression rate-limiting guard with sub-millisecond atomic memory barrier.",
-                    "target_loss": 200.0,
-                    "simulated_stolen_before": 200.0,
-                    "retest_stolen_after": 0.0,
-                    "mitigation_rate": 100.0,
-                    "score_target": min(99.9, 99.8 + (extra_r - 7) * 0.02),
-                    "red_elo_delta": -10,
-                    "blue_elo_delta": +20
-                })
+        def loss(report: Dict[str, Any]) -> float:
+            value = report.get("illegal_stolen_amount")
+            if value is None:
+                value = report.get("total_stolen_amount")
+            return float(value or 0.0)
 
-        # Thực thi từng vòng huấn luyện đối kháng
-        for cfg in active_rounds_config:
-            r_num = cfg["round"]
-            prev_score = current_score
-            current_score = cfg["score_target"]
-            red_elo += cfg["red_elo_delta"]
-            blue_elo += cfg["blue_elo_delta"]
+        rounds_history = []
+        red_elo = 1200
+        blue_elo = 1150
+        total_attack_illegal = 0
+        total_retest_illegal = 0
+        total_capital_defended = 0.0
+        total_attempts = 0
+        first_attack_report = None
+        last_retest_report = None
+
+        for r_num in range(1, total_rounds + 1):
+            scenario, scenario_desc, blue_tactic = round_templates[(r_num - 1) % len(round_templates)]
+            round_burst = burst_streams if scenario != "TOCTOU_RACE_CONDITION" or r_num == 1 else min(100, burst_streams * 2)
+
+            mock_store.set_all_patches(False)
+            attack_report = await self.sandbox_agent.execute_scenario(scenario, burst_count=round_burst)
+
+            mock_store.set_all_patches(True)
+            retest_report = await self.sandbox_agent.execute_scenario(scenario, burst_count=round_burst)
+
+            if first_attack_report is None:
+                first_attack_report = attack_report
+            last_retest_report = retest_report
+
+            attack_illegal = int(attack_report.get("illegal_claims_count") or 0)
+            retest_illegal = int(retest_report.get("illegal_claims_count") or 0)
+            attack_loss = loss(attack_report)
+            retest_loss = loss(retest_report)
+            total_attack_illegal += attack_illegal
+            total_retest_illegal += retest_illegal
+            total_capital_defended += max(0.0, attack_loss - retest_loss)
+            total_attempts += int(attack_report.get("total_requests") or 0)
+
+            if attack_illegal > 0:
+                mitigation_rate = round(max(0.0, 1.0 - (retest_illegal / attack_illegal)) * 100.0, 1)
+            else:
+                mitigation_rate = 0.0
+
+            scoring = self.arbiter_agent.compute_quantified_security_score(
+                attack_report=attack_report,
+                regression_report={},
+                retest_report=retest_report,
+            )
+            score_before = scoring.get("initial_score")
+            score_after = scoring.get("patched_score")
+
+            red_elo += 10 if retest_illegal > 0 else -5
+            blue_elo += 10 if retest_illegal == 0 else -5
 
             llm_red_insight = ""
             llm_blue_patch_diff = ""
             if llm_status["mode"] == "API_CONNECTED":
                 try:
-                    red_prompt = f"Analyze red team tactic: {cfg['red_tactic']}. Describe how an attacker mutates concurrency payloads."
+                    red_prompt = f"Analyze this measured mock-target scenario: {scenario}. Describe plausible attacker mutations."
                     llm_red_insight = await global_llm_engine.call_llm("You are Red Team Cerebrus.", red_prompt)
-                    blue_prompt = f"Synthesize Python patch for: {cfg['blue_tactic']}."
+                    blue_prompt = f"Suggest a defensive control for {blue_tactic}."
                     llm_blue_patch_diff = await global_llm_engine.call_llm("You are Blue Team Aegis.", blue_prompt)
                 except Exception:
                     pass
 
             rounds_history.append({
                 "round": r_num,
-                "title": cfg["title"],
-                "red_tactic": cfg["red_tactic"],
-                "red_description": cfg["red_desc"],
+                "title": f"Round {r_num}: {scenario_desc}",
+                "scenario": scenario,
+                "red_tactic": scenario,
+                "red_description": scenario_desc,
                 "llm_red_insight": llm_red_insight[:300] if llm_red_insight else None,
-                "blue_tactic": cfg["blue_tactic"],
-                "blue_description": cfg["blue_desc"],
+                "blue_tactic": blue_tactic,
+                "blue_description": f"Mock-target control enabled: {blue_tactic}.",
                 "llm_blue_patch": llm_blue_patch_diff[:300] if llm_blue_patch_diff else None,
-                "unpatched_loss_usd": cfg["simulated_stolen_before"],
-                "retest_loss_usd": cfg["retest_stolen_after"],
-                "mitigation_rate": cfg["mitigation_rate"],
-                "score_before": prev_score,
-                "score_after": current_score,
+                "attack_total_requests": int(attack_report.get("total_requests") or 0),
+                "attack_successful_requests": int(attack_report.get("successful_requests") or 0),
+                "retest_total_requests": int(retest_report.get("total_requests") or 0),
+                "retest_successful_requests": int(retest_report.get("successful_requests") or 0),
+                "retest_blocked_requests": int(retest_report.get("blocked_requests") or 0),
+                "unpatched_loss_usd": round(attack_loss, 2),
+                "retest_loss_usd": round(retest_loss, 2),
+                "mitigation_rate": mitigation_rate,
+                "score_before": score_before,
+                "score_after": score_after,
                 "red_elo": red_elo,
                 "blue_elo": blue_elo,
-                "round_status": "CONVERGED_NEUTRALIZED"
+                "round_status": "CONVERGED_NEUTRALIZED" if retest_illegal == 0 else "BREACHED",
             })
 
-        mock_store.patch_enabled = True
-
-        # Chạy kiểm tra Zero-Regression thực tế
+        mock_store.set_all_patches(True)
         regression_report = await self.blue_agent.run_zero_regression_test(50)
 
-        initial_attack_dummy = {
-            "burst_count": burst_streams,
-            "total_burst_count": burst_streams,
-            "successful_burst_claims": burst_streams,
-            "illegal_claims_count": burst_streams - 1,
-            "total_stolen_amount": 7500.0,
-            "status": "COMPLETED"
-        }
-        patch_dummy = {
-            "patch_strategy": "MULTI_TIER_ADAPTIVE_IDEMPOTENCY_AND_STATE_MACHINE",
+        patch_report = {
+            "patch_strategy": "MOCK_TARGET_CONTROLS",
             "patch_code": self.generate_composite_patch_diff(rounds_history),
-            "status": "PATCH_DEPLOYED"
+            "status": "SIMULATED_PATCH_DEPLOYED",
         }
-        retest_dummy = {
-            "total_burst_count": burst_streams,
-            "blocked_requests": burst_streams if current_score > 95 else burst_streams - 1,
-            "illegal_claims_count": 0
-        }
-        dossier = await self.arbiter_agent.generate_dossier(initial_attack_dummy, patch_dummy, regression_report, retest_dummy)
-        dossier["initial_score"] = base_scoring["initial_score"]
-        dossier["patched_score"] = current_score
-        dossier["security_score_before"] = base_scoring["initial_score"]
-        dossier["security_score_after"] = current_score
+        dossier = await self.arbiter_agent.generate_dossier(
+            first_attack_report or {},
+            patch_report,
+            regression_report,
+            last_retest_report or {},
+        )
 
         elapsed = round(time.time() - t0, 2)
+        final_mitigation = (
+            round(max(0.0, 1.0 - (total_retest_illegal / total_attack_illegal)) * 100.0, 1)
+            if total_attack_illegal else 0.0
+        )
 
         return {
             "success": True,
@@ -250,8 +166,8 @@ class AdversarialTrainer:
             "model_engine": f"{llm_status['provider']} ({llm_status['model_name']})",
             "has_api_key": llm_status["has_api_key"],
             "training_time_sec": elapsed,
-            "initial_security_score": base_scoring["initial_score"],
-            "final_security_score": current_score,
+            "initial_security_score": dossier.get("initial_score"),
+            "final_security_score": dossier.get("patched_score"),
             "score_progression": [r["score_after"] for r in rounds_history],
             "rounds_history": rounds_history,
             "final_red_elo": red_elo,
@@ -259,11 +175,13 @@ class AdversarialTrainer:
             "regression_report": regression_report,
             "dossier": dossier,
             "training_summary": {
-                "total_exploits_tested": burst_streams * len(rounds_history),
-                "total_capital_defended_usd": sum(r["unpatched_loss_usd"] - r["retest_loss_usd"] for r in rounds_history),
-                "final_mitigation_rate": 100.0,
-                "convergence_state": "NASH_EQUILIBRIUM_DEFENSE_PROVEN"
-            }
+                "total_exploits_tested": total_attempts,
+                "total_capital_defended_usd": round(total_capital_defended, 2),
+                "final_mitigation_rate": final_mitigation,
+                "convergence_state": (
+                    "MEASURED_CONVERGED" if total_retest_illegal == 0 else "NOT_CONVERGED"
+                ),
+            },
         }
 
     async def run_multicycle_recheck(self, cycles: int = 5, burst_streams: int = 15) -> Dict[str, Any]:

@@ -6,6 +6,8 @@ except (ImportError, ModuleNotFoundError):
     except (ImportError, ModuleNotFoundError):
         from stream_engine import stream_engine
 
+from contextlib import asynccontextmanager
+
 
 try:
     from backend.pii_scanner import global_pii_scanner
@@ -20,6 +22,10 @@ except (ImportError, ModuleNotFoundError):
 
 import os
 import sys
+import hmac
+import html
+import secrets
+import uuid
 from pathlib import Path
 
 # Ensure project root and backend dir are in sys.path
@@ -35,7 +41,7 @@ from typing import Dict, Any
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 try:
     from backend.mock_target.store import mock_store
@@ -44,7 +50,7 @@ try:
     from backend.database import (
         get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
         import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
-        get_table_schema, DB_PATH, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
+        get_table_schema, DB_PATH, init_db, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
     )
     from backend.text_to_sql import generate_sql_from_prompt
     from backend.agents.rea_dissector import READissectorAgent
@@ -66,7 +72,7 @@ except (ImportError, ModuleNotFoundError):
         from .database import (
             get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
             import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
-            get_table_schema, DB_PATH, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
+            get_table_schema, DB_PATH, init_db, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
         )
         from .text_to_sql import generate_sql_from_prompt
         from .agents.rea_dissector import READissectorAgent
@@ -87,7 +93,7 @@ except (ImportError, ModuleNotFoundError):
         from database import (
             get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
             import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
-            get_table_schema, DB_PATH, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
+            get_table_schema, DB_PATH, init_db, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
         )
         from text_to_sql import generate_sql_from_prompt
         from agents.rea_dissector import READissectorAgent
@@ -102,19 +108,59 @@ except (ImportError, ModuleNotFoundError):
         from agents.work_order_generator import global_work_order_generator
         from database import get_incident_memory, add_incident_memory, get_policy_rules, toggle_policy_rule
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup: make sure the default DB has its schema on a fresh clone
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[AIGIS] Failed to initialise default database schema: {e}")
+    try:
+        stream_engine.start(tps=10, attack_ratio=0.01)
+        print("[AIGIS] Live Telemetry Stream Engine started (10 TPS, 99% Benign, 1% Attack).")
+    except Exception as e:
+        print(f"[AIGIS] Failed to start stream engine: {e}")
+    yield
+    # shutdown
+    try:
+        stream_engine.stop()
+    except Exception:
+        pass
+
+AIGIS_API_TOKEN = os.getenv("AIGIS_API_TOKEN") or secrets.token_urlsafe(32)
+_ENABLE_DOCS = os.getenv("AIGIS_ENABLE_DOCS", "0") == "1"
+
 app = FastAPI(
     title="AIGIS Autonomous Wargame Engine",
     description="Adversarial Intelligence for Generative Immunity & Security — Multi-Agent Proving Ground",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _ENABLE_DOCS else None,
+    redoc_url="/redoc" if _ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if _ENABLE_DOCS else None,
 )
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    TrustedHostMiddleware,
+    allowed_hosts=["127.0.0.1", "localhost", "testserver"],
 )
+
+
+@app.middleware("http")
+async def local_api_auth_middleware(request: Request, call_next):
+    """Require the per-process token for every API call; the UI receives it in a meta tag."""
+    if request.url.path.startswith("/api/"):
+        supplied = request.headers.get("x-aigis-token", "")
+        # Plain <a href> downloads can't set headers; allow a query token for this read-only GET only.
+        if not supplied and request.method == "GET" and request.url.path == "/api/v1/dataset/download":
+            supplied = request.query_params.get("token", "")
+        if not hmac.compare_digest(supplied, AIGIS_API_TOKEN):
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 # Khởi tạo các Agent
 rea_agent = READissectorAgent()
@@ -236,6 +282,7 @@ async def run_stage_red(request: Request = None):
             burst_count = int(body.get("burst_streams", 15))
         except Exception:
             pass
+    burst_count = min(burst_count, 100)
 
     if not wargame_state.get("rea_report"):
         wargame_state["rea_report"] = await rea_agent.analyze_target(BUNDLE_FILE)
@@ -254,6 +301,7 @@ async def run_stage_attack(request: Request = None):
             burst_count = int(body.get("burst_streams", 15))
         except Exception:
             pass
+    burst_count = min(burst_count, 100)
 
     # Clean reset so exploit consistently demonstrates vulnerability
     mock_store.reset()
@@ -285,6 +333,7 @@ async def run_stage_retest(request: Request = None):
             burst_count = int(body.get("burst_streams", 15))
         except Exception:
             pass
+    burst_count = min(burst_count, 100)
 
     # Tấn công lại sau khi đã vá
     retest_report = await sandbox_agent.execute_burst_attack(
@@ -316,6 +365,8 @@ async def run_multicycle_recheck_endpoint(request: Request = None):
             burst_count = int(body.get("burst_streams", 15))
         except Exception:
             pass
+    cycles = min(cycles, 20)
+    burst_count = min(burst_count, 100)
     return await global_adversarial_trainer.run_multicycle_recheck(cycles=cycles, burst_streams=burst_count)
 
 @app.post("/api/v1/wargame/stage/6_dossier")
@@ -341,6 +392,8 @@ async def train_adversarial_wargame(request: Request = None):
             burst_count = int(body.get("burst_streams", 15))
         except Exception:
             pass
+    rounds = min(rounds, 10)
+    burst_count = min(burst_count, 100)
             
     result = await global_adversarial_trainer.train_adversarial_rounds(total_rounds=rounds, burst_streams=burst_count)
     wargame_state["training_history"] = result.get("rounds_history", [])
@@ -360,6 +413,8 @@ async def run_full_wargame(request: Request = None):
             rounds = int(body.get("rounds", 1))
         except Exception:
             pass
+    burst_count = min(burst_count, 100)
+    rounds = min(rounds, 10)
 
     if rounds > 1:
         return await train_adversarial_wargame(request)
@@ -431,8 +486,10 @@ async def generate_dataset_endpoint(request: Request = None):
             attack_ratio = float(body.get("attack_ratio", 0.035))
         except Exception:
             pass
+    total_rows = max(1, min(total_rows, 2_000_000))
+    attack_ratio = max(0.001, min(attack_ratio, 0.5))
 
-    stats = generate_million_row_dataset(total_rows=total_rows, attack_ratio=attack_ratio)
+    stats = await asyncio.to_thread(generate_million_row_dataset, total_rows=total_rows, attack_ratio=attack_ratio)
     return stats
 
 @app.get("/api/v1/dataset/download")
@@ -489,7 +546,7 @@ async def execute_sql_endpoint(request: Request):
     body = await request.json()
     query = body.get("query", "SELECT * FROM telemetry LIMIT 10")
     max_limit = int(body.get("max_limit", 50))
-    result = execute_raw_sql(query, max_limit=max_limit)
+    result = await asyncio.to_thread(execute_raw_sql, query, max_limit)
     return result
 
 @app.post("/api/v1/database/connect")
@@ -502,46 +559,76 @@ async def connect_database_endpoint(request: Request):
     res = set_active_db(db_path)
     return res
 
+async def _stream_upload_to_disk(file: UploadFile, dest_path: Path, max_bytes: int = 50 * 1024 * 1024) -> tuple[bool, str]:
+    total = 0
+    with open(dest_path, "wb") as fout:
+        async for chunk in file:
+            total += len(chunk)
+            if total > max_bytes:
+                fout.close()
+                try:
+                    dest_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                return False, "File exceeds 50 MB limit"
+            fout.write(chunk)
+    return True, ""
+
+
 @app.post("/api/v1/database/upload_db")
 async def upload_database_endpoint(file: UploadFile = File(...)):
     """Tải lên file Database SQLite (.db, .sqlite) và kết nối thẳng"""
-    if not any(file.filename.lower().endswith(ext) for ext in [".db", ".sqlite", ".sqlite3"]):
+    original_name = os.path.basename(file.filename or "").strip()
+    if not original_name.lower().endswith((".db", ".sqlite", ".sqlite3")):
         return JSONResponse(status_code=400, content={"success": False, "error": "Only .db, .sqlite, and .sqlite3 database files are accepted"})
-    
-    upload_dir = os.path.join(BASE_DIR, "backend", "datasets", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    dest_path = os.path.join(upload_dir, file.filename)
-    
-    with open(dest_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-        
-    res = set_active_db(dest_path)
+
+    upload_dir = Path(BASE_DIR) / "backend" / "datasets" / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex[:12]}{Path(original_name).suffix.lower()}"
+    dest_path = upload_dir / stored_name
+
+    ok, error = await _stream_upload_to_disk(file, dest_path)
+    if not ok:
+        return JSONResponse(status_code=413, content={"success": False, "error": error})
+
+    res = set_active_db(str(dest_path))
+    if not res.get("success"):
+        try:
+            dest_path.unlink(missing_ok=True)
+        except OSError:
+            pass
     if isinstance(res, dict):
-        res["source_name"] = file.filename
+        res["source_name"] = original_name
+        res["stored_name"] = stored_name
         res["source_type"] = "db"
     return res
 
 @app.post("/api/v1/database/upload_csv")
 async def upload_csv_endpoint(file: UploadFile = File(...), table_name: str = "telemetry"):
     """Tải lên file CSV bất kỳ và nạp thẳng vào SQLite Database"""
-    if not file.filename.lower().endswith(".csv"):
+    original_name = os.path.basename(file.filename or "").strip()
+    if not original_name.lower().endswith(".csv"):
         return JSONResponse(status_code=400, content={"success": False, "error": "Only .csv files are accepted"})
-    
-    upload_dir = os.path.join(BASE_DIR, "backend", "datasets", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    dest_path = os.path.join(upload_dir, file.filename)
-    
-    with open(dest_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-        
-    db_filename = f"{os.path.splitext(file.filename)[0]}.db"
-    dest_db = os.path.join(upload_dir, db_filename)
-    
-    res = import_custom_csv_to_db(csv_file_path=dest_path, table_name=table_name, target_db_path=dest_db)
+
+    upload_dir = Path(BASE_DIR) / "backend" / "datasets" / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex[:12]}.csv"
+    dest_path = upload_dir / stored_name
+
+    ok, error = await _stream_upload_to_disk(file, dest_path)
+    if not ok:
+        return JSONResponse(status_code=413, content={"success": False, "error": error})
+
+    dest_db = upload_dir / f"{Path(stored_name).stem}.db"
+    res = await asyncio.to_thread(
+        import_custom_csv_to_db,
+        str(dest_path),
+        table_name,
+        str(dest_db),
+    )
     if isinstance(res, dict):
-        res["source_name"] = file.filename
+        res["source_name"] = original_name
+        res["stored_name"] = stored_name
         res["source_type"] = "csv"
     return res
 
@@ -560,7 +647,7 @@ async def text_to_sql_endpoint(request: Request):
 @app.post("/api/v1/database/sync")
 async def sync_csv_to_database():
     """Đồng bộ nạp toàn bộ file CSV 1,000,000 dòng vào SQLite Database"""
-    return import_csv_to_db()
+    return await asyncio.to_thread(import_csv_to_db)
 
 # ==============================================================================
 # 5. FRONTEND SERVING
@@ -600,7 +687,7 @@ async def classify_dataset_traffic(request: Request = None):
         from backend.traffic_classifier import run_autonomous_dataset_classification
     except Exception:
         from traffic_classifier import run_autonomous_dataset_classification
-    res = run_autonomous_dataset_classification(sample_limit=sample_limit)
+    res = await asyncio.to_thread(run_autonomous_dataset_classification, sample_limit=sample_limit)
     return res
 
 
@@ -626,12 +713,15 @@ async def serve_dashboard():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+            dashboard = f.read()
+        token_meta = f'<meta name="aigis-token" content="{html.escape(AIGIS_API_TOKEN, quote=True)}">'
+        dashboard = dashboard.replace("</head>", token_meta + "\n</head>", 1)
+        return HTMLResponse(content=dashboard)
     return HTMLResponse(content="<h1>AIGIS Dashboard not found in frontend/index.html</h1>", status_code=404)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.server:app", host="127.0.0.1", port=8000, reload=False)
 
 
 # ==============================================================================
@@ -812,22 +902,6 @@ async def set_velocity_rule_endpoint(request: Request = None):
 # REAL-TIME CONTINUOUS STREAMING ENGINE ENDPOINTS
 # =========================================================================
 
-@app.on_event("startup")
-async def startup_event():
-    """Tự động khởi chạy Live Streaming Telemetry Engine khi máy chủ khởi động"""
-    try:
-        stream_engine.start(tps=10, attack_ratio=0.01)
-        print("[AIGIS] Live Telemetry Stream Engine started automatically (10 TPS, 99% Benign, 1% Attack, 2s Batch).")
-    except Exception as e:
-        print(f"[AIGIS] Failed to auto-start stream engine: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Dừng luồng stream an toàn khi tắt máy chủ"""
-    try:
-        stream_engine.stop()
-    except Exception:
-        pass
 
 @app.get("/api/v1/stream/status")
 async def get_stream_status_endpoint():
@@ -846,6 +920,8 @@ async def start_stream_endpoint(request: Request = None):
             attack_ratio = float(body.get("attack_ratio", 0.01))
         except Exception:
             pass
+    tps = max(1, min(tps, 200))
+    attack_ratio = max(0.0, min(attack_ratio, 0.5))
     return stream_engine.start(tps=tps, attack_ratio=attack_ratio)
 
 @app.post("/api/v1/stream/pause")
@@ -889,7 +965,8 @@ async def evaluate_sentinel_endpoint(request: Request = None):
             window_sec = int(data.get("window_seconds", 15))
         except Exception:
             pass
-    return global_fintech_sentinel.evaluate_telemetry(window_seconds=window_sec)
+    window_sec = max(1, min(window_sec, 3600))
+    return await asyncio.to_thread(global_fintech_sentinel.evaluate_telemetry, window_seconds=window_sec)
 
 @app.post("/api/v1/sentinel/simulate")
 async def simulate_sentinel_scenario_endpoint(request: Request):

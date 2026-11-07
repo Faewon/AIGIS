@@ -12,8 +12,45 @@ import os
 import re
 import json
 import time
+from urllib.parse import urlparse
 import httpx
 from typing import Dict, Any, List, Optional
+
+ALLOWED_PROVIDERS = {"gemini", "groq", "openrouter", "openai", "cerebras", "sambanova", "github", "ollama", "heuristic"}
+DEFAULT_BASE_URLS = {
+    "groq": "https://api.groq.com/openai/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "openai": "https://api.openai.com/v1",
+    "cerebras": "https://api.cerebras.ai/v1",
+    "sambanova": "https://api.sambanova.ai/v1",
+    "github": "https://models.inference.ai.azure.com",
+    "ollama": "http://localhost:11434/v1",
+    "gemini": "",
+    "heuristic": ""
+}
+ALLOWED_HOSTS = {
+    "groq": {"api.groq.com"},
+    "openrouter": {"openrouter.ai"},
+    "openai": {"api.openai.com"},
+    "cerebras": {"api.cerebras.ai"},
+    "sambanova": {"api.sambanova.ai"},
+    "github": {"models.inference.ai.azure.com"},
+    "ollama": {"localhost", "127.0.0.1", "::1"},
+    "gemini": {"generativelanguage.googleapis.com"},
+    "heuristic": set()
+}
+
+def _is_allowed_base_url(provider: str, url: str) -> bool:
+    """Allow only the provider's official API host (or loopback for local Ollama)."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if not parsed.hostname:
+        return False
+    if provider == "ollama":
+        return parsed.scheme in ("http", "https") and parsed.hostname in ALLOWED_HOSTS["ollama"]
+    return parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS.get(provider, set())
 
 def normalize_gemini_model_name(name: str) -> str:
     """Chuẩn hóa tên model Gemini thành định dạng API hợp lệ của Google"""
@@ -32,65 +69,89 @@ def normalize_gemini_model_name(name: str) -> str:
 class LLMEngine:
     def __init__(self):
         # Đọc cấu hình từ môi trường hoặc khởi tạo mặc định
-        self.provider = os.getenv("AIGIS_LLM_PROVIDER", "heuristic") # "gemini", "groq", "openrouter", "openai", "ollama", "heuristic"
+        env_provider = (os.getenv("AIGIS_LLM_PROVIDER", "heuristic") or "heuristic").strip().lower()
+        self.provider = env_provider if env_provider in ALLOWED_PROVIDERS else "heuristic"
         self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
         self.last_call_error: Optional[str] = None
         self.last_call_latency_ms: Optional[float] = None
         self.last_call_success: bool = False
         self.last_raw_response: str = ""
         self._cached_gemini_models: List[str] = []
-        
-        # Mặc định model theo provider
-        if self.provider == "gemini":
-            self.model_name = "gemini-1.5-flash-latest"
-            self.base_url = ""
-        elif self.provider == "groq":
-            self.model_name = "llama-3.3-70b-versatile"
-            self.base_url = "https://api.groq.com/openai/v1"
-        elif self.provider == "openrouter":
-            self.model_name = "meta-llama/llama-3.3-70b-instruct:free"
-            self.base_url = "https://openrouter.ai/api/v1"
-        else:
-            self.model_name = "heuristic-reasoner-v1"
-            self.base_url = "http://localhost:11434/v1"
+
+        default_models = {
+            "gemini": "gemini-1.5-flash-latest",
+            "groq": "llama-3.3-70b-versatile",
+            "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
+            "openai": "gpt-4o-mini",
+            "cerebras": "llama-3.3-70b",
+            "sambanova": "Meta-Llama-3.3-70B-Instruct",
+            "github": "gpt-4o-mini",
+            "ollama": "llama3.2",
+            "heuristic": "heuristic-reasoner-v1"
+        }
+        self.model_name = default_models.get(self.provider, "heuristic-reasoner-v1")
+        self.base_url = DEFAULT_BASE_URLS.get(self.provider, "")
 
     def configure(self, provider: str, api_key: str = "", model_name: str = "", base_url: str = ""):
-        self.provider = provider
-        if api_key:
+        # Validate provider against safe allowlist
+        clean_provider = (provider or "heuristic").strip().lower()
+        if clean_provider not in ALLOWED_PROVIDERS:
+            clean_provider = "heuristic"
+
+        # Nếu đổi sang provider khác mà không truyền api_key mới, xóa key cũ để chống đánh cắp key qua base_url
+        if clean_provider != self.provider and not api_key:
+            self.api_key = ""
+        elif api_key:
             self.api_key = api_key.strip()
-            self._cached_gemini_models = [] # Reset cache khi đổi key
-        
+            self._cached_gemini_models = []
+
+        self.provider = clean_provider
+
         if model_name:
-            if provider == "gemini":
+            if clean_provider == "gemini":
                 self.model_name = normalize_gemini_model_name(model_name)
             else:
                 self.model_name = model_name.strip()
         else:
-            if provider == "gemini":
-                self.model_name = "gemini-1.5-flash-latest"
-            elif provider == "groq":
-                self.model_name = "llama-3.3-70b-versatile"
-                self.base_url = "https://api.groq.com/openai/v1"
-            elif provider == "openrouter":
-                self.model_name = "meta-llama/llama-3.3-70b-instruct:free"
-                self.base_url = "https://openrouter.ai/api/v1"
-            elif provider == "openai":
-                self.model_name = "gpt-4o-mini"
-                self.base_url = "https://api.openai.com/v1"
+            default_models = {
+                "gemini": "gemini-1.5-flash-latest",
+                "groq": "llama-3.3-70b-versatile",
+                "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
+                "openai": "gpt-4o-mini",
+                "cerebras": "llama-3.3-70b",
+                "sambanova": "Meta-Llama-3.3-70B-Instruct",
+                "github": "gpt-4o-mini",
+                "ollama": "llama3.2",
+                "heuristic": "heuristic-reasoner-v1"
+            }
+            self.model_name = default_models.get(clean_provider, "heuristic-reasoner-v1")
 
+        # Thiết lập base_url mặc định theo provider
+        self.base_url = DEFAULT_BASE_URLS.get(clean_provider, "")
+
+        # Nếu người dùng chỉ định base_url tùy chỉnh: chỉ chấp nhận host chính thức của provider
+        base_url_error = None
         if base_url:
-            self.base_url = base_url.strip()
-        self.last_call_error = None
+            clean_url = base_url.strip().rstrip("/")
+            if _is_allowed_base_url(clean_provider, clean_url):
+                self.base_url = clean_url
+            else:
+                base_url_error = (
+                    f"Rejected base URL for {clean_provider}: only the provider's official API host is allowed."
+                )
+
+        self.last_call_error = base_url_error
 
     def get_status(self) -> Dict[str, Any]:
-        is_connected = bool(self.api_key) or self.provider == "ollama"
+        keyed_providers = {"gemini", "groq", "openrouter", "openai", "cerebras", "sambanova", "github"}
+        is_connected = (self.provider in keyed_providers and bool(self.api_key)) or self.provider == "ollama"
         return {
             "provider": self.provider,
             "model_name": self.model_name,
             "has_api_key": bool(self.api_key),
             "base_url": self.base_url,
-            "mode": "API_CONNECTED" if (self.provider in ["gemini", "groq", "openrouter", "openai"] and self.api_key) or self.provider == "ollama" else "AUTONOMOUS_HEURISTIC_REACT",
-            "is_free_tier": self.provider in ["gemini", "groq", "openrouter", "ollama", "heuristic"],
+            "mode": "API_CONNECTED" if is_connected else "AUTONOMOUS_HEURISTIC_REACT",
+            "is_free_tier": self.provider in ["gemini", "groq", "openrouter", "cerebras", "sambanova", "github", "ollama", "heuristic"],
             "last_error": self.last_call_error,
             "last_latency_ms": self.last_call_latency_ms
         }
@@ -102,10 +163,11 @@ class LLMEngine:
         if self._cached_gemini_models:
             return self._cached_gemini_models
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={self.api_key}"
+        url = "https://generativelanguage.googleapis.com/v1beta/models"
+        headers = {"x-goog-api-key": self.api_key}
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(url)
+                resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
                     data = resp.json()
                     models = []
@@ -205,7 +267,7 @@ class LLMEngine:
             resp = ""
             if self.provider == "gemini" and self.api_key:
                 resp = await self._call_gemini(system_prompt, user_prompt, temperature)
-            elif self.provider in ["groq", "openrouter", "openai"] and self.api_key:
+            elif self.provider in ["groq", "openrouter", "openai", "cerebras", "sambanova", "github"] and self.api_key:
                 resp = await self._call_openai_compatible_with_key(system_prompt, user_prompt, temperature)
             elif self.provider == "ollama":
                 resp = await self._call_openai_compatible_no_key(system_prompt, user_prompt, temperature)
@@ -274,9 +336,10 @@ class LLMEngine:
         async with httpx.AsyncClient(timeout=30.0) as client:
             for candidate in candidates:
                 for api_ver in ["v1beta", "v1"]:
-                    endpoint = f"https://generativelanguage.googleapis.com/{api_ver}/models/{candidate}:generateContent?key={self.api_key}"
+                    endpoint = f"https://generativelanguage.googleapis.com/{api_ver}/models/{candidate}:generateContent"
+                    headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
                     try:
-                        resp = await client.post(endpoint, json=payload)
+                        resp = await client.post(endpoint, json=payload, headers=headers)
                         if resp.status_code == 200:
                             data = resp.json()
                             self.model_name = candidate # Ghi nhớ model đã chạy thành công
@@ -318,13 +381,10 @@ class LLMEngine:
             return ""
 
     async def _call_openai_compatible_with_key(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
-        base = self.base_url
-        if self.provider == "groq" and not base:
-            base = "https://api.groq.com/openai/v1"
-        elif self.provider == "openrouter" and not base:
-            base = "https://openrouter.ai/api/v1"
-        elif self.provider == "openai" and not base:
-            base = "https://api.openai.com/v1"
+        base = self.base_url or DEFAULT_BASE_URLS.get(self.provider, "")
+        if not _is_allowed_base_url(self.provider, base):
+            self.last_call_error = f"Refusing to send API key to untrusted base URL: {base!r}"
+            return ""
 
         endpoint = f"{base}/chat/completions"
         headers = {
@@ -355,6 +415,9 @@ class LLMEngine:
                 return ""
 
     async def _call_openai_compatible_no_key(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
+        if not _is_allowed_base_url("ollama", self.base_url):
+            self.last_call_error = f"Refusing to call untrusted local base URL: {self.base_url!r}"
+            return ""
         endpoint = f"{self.base_url}/chat/completions"
         payload = {
             "model": self.model_name,

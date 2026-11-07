@@ -57,43 +57,50 @@ class FinTechSentinelAgent:
             "thought_chain": []
         }
 
-    def evaluate_telemetry(self, window_seconds: int = 15) -> Dict[str, Any]:
+    def evaluate_telemetry(self, window_seconds: int = 15, events_override: Optional[List[Dict[str, Any]]] = None,
+                           policies_override: Optional[List[Dict[str, Any]]] = None,
+                           now_override: Optional[float] = None) -> Dict[str, Any]:
         """
         Thuc thi chu trinh danh gia giam sat Sentinel tren cua so truot window_seconds:
-        1. Doc du lieu thoi gian thuc tu SQLite / Stream Engine
+        1. Doc du lieu thoi gian thuc tu SQLite / Stream Engine (hoac fixture synthetic)
         2. Tinh toan bien thien van toc (dTPS/dt) va mat do clustering
         3. Chay thuat toan Tail Forecasting du bao quy dao sau 30 giay
         4. Kiem tra bo loc ngu canh Contextual Stand-Down (Flash Sale vs Exploit)
         5. Doi chieu Incident Memory KB va dua ra phan quyet
         """
-        now = time.time()
+        now = now_override if now_override is not None else time.time()
         now_ms = int(now * 1000)
         window_ms = window_seconds * 1000
         min_epoch = now_ms - window_ms
-        
+        is_simulated = events_override is not None
+
         thought_chain = []
         thought_chain.append(f"[THOUGHT 1] Sentinel scanning operational sliding window: last {window_seconds}s (epoch >= {min_epoch}).")
 
-        # 1. Truy van du lieu tu SQLite
+        # 1. Truy van du lieu tu SQLite, hoac dung fixture synthetic cho scenario demo
         events = []
-        try:
-            conn = get_connection(self.db_path)
-            cur = conn.cursor()
-            cur.execute("""
-            SELECT event_id, epoch_ms, user_id, api_endpoint, transaction_amount_usd,
-                   is_attack, attack_type, is_datacenter_proxy, burst_stream_id,
-                   network_rtt_ms, server_latency_ms
-            FROM telemetry
-            WHERE epoch_ms >= ?
-            ORDER BY epoch_ms DESC
-            LIMIT 500
-            """, (min_epoch,))
-            events = [dict(r) for r in cur.fetchall()]
-            conn.close()
-        except Exception as e:
-            thought_chain.append(f"[WARNING] Fallback to in-memory stream buffer: {str(e)}")
-            # Fallback to in-memory events from stream_engine
-            events = list(stream_engine.recent_events)
+        if events_override is not None:
+            events = [dict(e) for e in events_override]
+            thought_chain.append("[DATA SOURCE] Synthetic scenario fixture (not live production telemetry).")
+        else:
+            try:
+                conn = get_connection(self.db_path)
+                cur = conn.cursor()
+                cur.execute("""
+                SELECT event_id, epoch_ms, user_id, api_endpoint, transaction_amount_usd,
+                       is_attack, attack_type, is_datacenter_proxy, burst_stream_id,
+                       network_rtt_ms, server_latency_ms
+                FROM telemetry
+                WHERE epoch_ms >= ?
+                ORDER BY epoch_ms DESC
+                LIMIT 500
+                """, (min_epoch,))
+                events = [dict(r) for r in cur.fetchall()]
+                conn.close()
+            except Exception as e:
+                thought_chain.append(f"[WARNING] Fallback to in-memory stream buffer: {str(e)}")
+                # Fallback to in-memory events from stream_engine
+                events = list(stream_engine.recent_events)
 
         total_events = len(events)
         elapsed_sec = max(1.0, now - self.last_eval_time)
@@ -133,9 +140,12 @@ class FinTechSentinelAgent:
                         if uid not in clustered_users:
                             clustered_users.append(uid)
 
-        # Detect active burst stream IDs (Single-Packet Fuzzing)
-        burst_streams = set(e.get("burst_stream_id") for e in events if e.get("burst_stream_id"))
-        attack_events = sum(1 for e in events if e.get("is_attack") == 1)
+        # Detect active burst stream IDs. Ground-truth `is_attack` is intentionally
+        # not used for live decisions; it would leak labels into the detector.
+        burst_streams = {
+            b for b in (e.get("burst_stream_id") for e in events)
+            if b and str(b) not in ("NONE", "null", "None", "")
+        }
 
         # Calculate high-risk voucher drain velocity
         voucher_claims = [e for e in events if "/voucher/claim" in str(e.get("api_endpoint", ""))]
@@ -158,13 +168,27 @@ class FinTechSentinelAgent:
         )
 
         # 4. Contextual Filter (Check active business policies & promotional windows)
-        policies = get_policy_rules()
+        policies = policies_override if policies_override is not None else get_policy_rules()
         flash_sale_active = False
         flash_sale_rule = None
         burst_ceiling = 30.0
 
+        def _within_window(pol: Dict[str, Any]) -> bool:
+            # A lapsed or not-yet-started promotion must not suppress alerts.
+            fmt = "%Y-%m-%d %H:%M:%S"
+            try:
+                start = pol.get("active_from")
+                end = pol.get("active_to")
+                if start and now < time.mktime(time.strptime(str(start)[:19], fmt)):
+                    return False
+                if end and now > time.mktime(time.strptime(str(end)[:19], fmt)):
+                    return False
+            except (ValueError, OverflowError):
+                return False
+            return True
+
         for pol in policies:
-            if pol.get("is_active") == 1:
+            if pol.get("is_active") == 1 and _within_window(pol):
                 if pol.get("rule_type") == "FLASH_SALE_WINDOW":
                     flash_sale_active = True
                     flash_sale_rule = pol
@@ -183,7 +207,6 @@ class FinTechSentinelAgent:
         is_exploit_burst = (
             concurrency_clusters >= 3 or
             len(burst_streams) > 0 or
-            attack_events >= 2 or
             (current_tps > 20.0 and user_entropy < 0.35 and proxy_ratio > 0.30)
         )
 
@@ -192,8 +215,9 @@ class FinTechSentinelAgent:
             verdict_badge = "CRITICAL ANOMALY (EXPLOIT BURST)"
             severity = "CRITICAL"
             reason = (
-                f"Sub-millisecond concurrency clustering detected ({concurrency_clusters} collisions, {len(clustered_users)} accounts). "
-                f"High probability of HTTP/2 Single-Packet TOCTOU race condition or Sybil bot swarm targeting /api/v1/voucher/claim."
+                f"Concurrency clustering detected ({concurrency_clusters} inter-arrival gaps <=50ms, "
+                f"{len(clustered_users)} accounts). This is a heuristic signal for a possible race-condition "
+                f"attempt or bot swarm; it is not proof of a specific HTTP/2 technique."
             )
             recommended_action = "ESCALATE_TO_INVESTIGATOR"
             active_context = "ATTACK_IN_PROGRESS"
@@ -270,6 +294,9 @@ class FinTechSentinelAgent:
         eval_result = {
             "epoch_ms": now_ms,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "is_simulated": is_simulated,
+            "data_source": "SYNTHETIC_SCENARIO" if is_simulated else "ACTIVE_DB",
+            "campaign_pool_usd": CAMPAIGN_POOL_USD,
             "verdict": verdict,
             "verdict_badge": verdict_badge,
             "severity": severity,
@@ -315,142 +342,109 @@ class FinTechSentinelAgent:
             "history": list(self.evaluation_history)
         }
 
+    def _build_scenario_events(self, scenario: str, now_ms: int, window_seconds: int = 15):
+        """Build deterministic synthetic telemetry for UI scenario demos."""
+        events = []
+        policies = []
+        if scenario == "flash_sale":
+            tps = 38.5
+            count = int(tps * window_seconds)
+            unique_users = max(1, int(count * 0.88))
+            proxy_count = int(count * 0.04)
+            for i in range(count):
+                events.append({
+                    "event_id": f"SIM-FLASH-{i:05d}",
+                    "epoch_ms": now_ms - int((i / count) * window_seconds * 1000),
+                    "user_id": f"USR_FLASH_{i % unique_users:05d}",
+                    "api_endpoint": "/api/v1/voucher/claim",
+                    "transaction_amount_usd": 50.0,
+                    "is_attack": 0,
+                    "attack_type": "BENIGN",
+                    "is_datacenter_proxy": 1 if i < proxy_count else 0,
+                    "burst_stream_id": "NONE",
+                    "network_rtt_ms": 12.0,
+                    "server_latency_ms": 4.0,
+                })
+            policies = [
+                {"rule_type": "FLASH_SALE_WINDOW", "is_active": 1, "name": "Synthetic Flash Sale", "threshold_value": 30.0},
+                {"rule_type": "MAX_BURST_TPS", "is_active": 1, "name": "Synthetic Burst Ceiling", "threshold_value": 30.0},
+            ]
+        elif scenario == "toctou_attack":
+            tps = 24.0
+            count = int(tps * window_seconds)
+            proxy_count = int(count * 0.65)
+            for i in range(count):
+                events.append({
+                    "event_id": f"SIM-TOCTOU-{i:05d}",
+                    "epoch_ms": now_ms - (i * 2),
+                    "user_id": "USR_VN_00863" if i < int(count * 0.8) else "USR_VN_00104",
+                    "api_endpoint": "/api/v1/voucher/claim",
+                    "transaction_amount_usd": 500.0,
+                    "is_attack": 1,
+                    "attack_type": "TOCTOU_RACE_CONDITION",
+                    "is_datacenter_proxy": 1 if i < proxy_count else 0,
+                    "burst_stream_id": "burst_toctou_synthetic",
+                    "network_rtt_ms": 2.0,
+                    "server_latency_ms": 1.0,
+                })
+            policies = [
+                {"rule_type": "FLASH_SALE_WINDOW", "is_active": 1, "name": "Synthetic Flash Sale", "threshold_value": 30.0},
+                {"rule_type": "MAX_BURST_TPS", "is_active": 1, "name": "Synthetic Burst Ceiling", "threshold_value": 30.0},
+            ]
+        elif scenario == "drift_accelerate":
+            tps = 22.0
+            count = int(tps * window_seconds)
+            unique_users = max(1, int(count * 0.85))
+            proxy_count = int(count * 0.08)
+            for i in range(count):
+                events.append({
+                    "event_id": f"SIM-DRIFT-{i:05d}",
+                    "epoch_ms": now_ms - int((i / count) * window_seconds * 1000),
+                    "user_id": f"USR_DRIFT_{i % unique_users:05d}",
+                    "api_endpoint": "/api/v1/checkout",
+                    "transaction_amount_usd": 20.0,
+                    "is_attack": 0,
+                    "attack_type": "BENIGN",
+                    "is_datacenter_proxy": 1 if i < proxy_count else 0,
+                    "burst_stream_id": "NONE",
+                    "network_rtt_ms": 20.0,
+                    "server_latency_ms": 8.0,
+                })
+            policies = [
+                {"rule_type": "MAX_BURST_TPS", "is_active": 1, "name": "Synthetic Burst Ceiling", "threshold_value": 30.0},
+            ]
+        return events, policies
+
     def simulate_scenario(self, scenario: str = "flash_sale") -> Dict[str, Any]:
         """
-        Gia lap cac kich ban thuc te de kiem chung hanh vi Sentinel:
-        - 'flash_sale': Tang dot bien TPS nhung nguoi dung da dang -> Sentinel chon STAND_DOWN
-        - 'toctou_attack': Concurrency burst cung 1 user tren /voucher/claim -> Sentinel chon CRITICAL_ANOMALY
-        - 'drift_accelerate': Tang deu toc do giao dich -> Sentinel chon DRIFT_WARNING
-        - 'normal': Tra ve baseline binh thuong
+        Chay mot fixture synthetic qua cung engine danh gia de demo:
+        - 'flash_sale': nhieu nguoi dung da dang -> STAND_DOWN
+        - 'toctou_attack': burst cung user tren /voucher/claim -> CRITICAL_ANOMALY
+        - 'drift_accelerate': TPS tang deu -> DRIFT_WARNING
+        - 'normal': doc du lieu that trong DB hien hanh
         """
-        now = time.time()
-        now_ms = int(now * 1000)
-
-        if scenario == "flash_sale":
-            result = {
-                "epoch_ms": now_ms,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "verdict": "STAND_DOWN",
-                "verdict_badge": "STAND_DOWN (FLASH SALE CONTEXT)",
-                "severity": "INFO",
-                "tps": 38.5,
-                "velocity_derivative": +1.85,
-                "user_entropy": 0.88,
-                "proxy_ratio": 0.04,
-                "concurrency_clusters": 0,
-                "clustered_users_sample": [],
-                "burst_streams_detected": [],
-                "tail_forecast_t15": 66.2,
-                "tail_forecast_t30": 94.0,
-                "tail_forecast_t60": 149.5,
-                "drain_velocity_usd_s": 850.0,
-                "time_to_exhaustion_s": 117.6,
-                "active_context": "FLASH_SALE_STAND_DOWN",
-                "flash_sale_active": True,
-                "burst_ceiling_tps": 30.0,
-                "reason": (
-                    "Traffic surge detected (38.5 tx/s), but Contextual Stand-Down Filter confirmed active "
-                    "'Tet Super Sale 50% Flash Promotion' with 88% distinct legitimate buyers and clean residential IPs. "
-                    "Standing down to prevent false-positive checkout blockage."
-                ),
-                "recommended_action": "STAND_DOWN_MONITORING",
-                "recalled_incident": None,
-                "thought_chain": [
-                    "[THOUGHT 1] Sentinel scanning operational sliding window: last 15s.",
-                    "[OBSERVATION 1] Telemetry surge detected: 38.5 tx/s (+1.85 tx/s^2).",
-                    "[CONTEXT CHECK] Active policy found: RULE_FLASH_SALE_TET (Tet Super Sale 50%).",
-                    "[ENTROPY VERIFICATION] User entropy is 88.0% (high consumer diversity). Proxy ratio is 4.0% (residential).",
-                    "[SENTINEL VERDICT] STAND DOWN. Promotion context matches legitimate shopping pattern. Suppressing false alarm."
-                ]
-            }
-        elif scenario == "toctou_attack":
-            result = {
-                "epoch_ms": now_ms,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "verdict": "CRITICAL_ANOMALY",
-                "verdict_badge": "CRITICAL ANOMALY (EXPLOIT BURST)",
-                "severity": "CRITICAL",
-                "tps": 24.0,
-                "velocity_derivative": +2.40,
-                "user_entropy": 0.12,
-                "proxy_ratio": 0.65,
-                "concurrency_clusters": 14,
-                "clustered_users_sample": ["USR_VN_00863", "USR_VN_00104"],
-                "burst_streams_detected": ["burst_toctou_7a2f1b"],
-                "tail_forecast_t15": 60.0,
-                "tail_forecast_t30": 96.0,
-                "tail_forecast_t60": 168.0,
-                "drain_velocity_usd_s": 7500.0,
-                "time_to_exhaustion_s": 13.3,
-                "active_context": "ATTACK_IN_PROGRESS",
-                "flash_sale_active": True,
-                "burst_ceiling_tps": 30.0,
-                "reason": (
-                    "Sub-millisecond concurrency clustering detected (14 collisions, identical user USR_VN_00863). "
-                    "High probability of HTTP/2 Single-Packet TOCTOU race condition targeting /api/v1/voucher/claim. Immediate handoff to Deep Investigator required."
-                ),
-                "recommended_action": "ESCALATE_TO_INVESTIGATOR",
-                "recalled_incident": {
-                    "incident_id": "INC-2026-001",
-                    "threat_type": "TOCTOU_RACE_CONDITION",
-                    "financial_loss": 7500.0,
-                    "remediation_patch": "Redis SET NX distributed lock with 3.0s lease TTL on user_id key to serialize atomic voucher redemption."
-                },
-                "thought_chain": [
-                    "[THOUGHT 1] Sentinel scanning operational sliding window: last 15s.",
-                    "[OBSERVATION 1] Single-Packet burst pattern detected on stream 'burst_toctou_7a2f1b'.",
-                    "[CLUSTER DETECTION] 14 requests arrived within <= 2ms window from user 'USR_VN_00863'.",
-                    "[MEMORY RECALL] Matched past incident INC-2026-001 (TOCTOU Race Condition on Tet Voucher).",
-                    "[SENTINEL VERDICT] CRITICAL ANOMALY. Escalating to Deep Investigator and Blue Team CRS."
-                ]
-            }
-        elif scenario == "drift_accelerate":
-            result = {
-                "epoch_ms": now_ms,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "verdict": "DRIFT_WARNING",
-                "verdict_badge": "DRIFT WARNING (TRAJECTORY ACCELERATING)",
-                "severity": "MEDIUM",
-                "tps": 22.0,
-                "velocity_derivative": +0.65,
-                "user_entropy": 0.85,
-                "proxy_ratio": 0.08,
-                "concurrency_clusters": 0,
-                "clustered_users_sample": [],
-                "burst_streams_detected": [],
-                "tail_forecast_t15": 31.7,
-                "tail_forecast_t30": 41.5,
-                "tail_forecast_t60": 61.0,
-                "drain_velocity_usd_s": 120.0,
-                "time_to_exhaustion_s": 833.3,
-                "active_context": "TRAJECTORY_ACCELERATING",
-                "flash_sale_active": False,
-                "burst_ceiling_tps": 30.0,
-                "reason": (
-                    "Transaction velocity trajectory accelerating (+0.65 tx/s^2). "
-                    "Tail forecast projects gateway ceiling breach (30.0 TPS) in approximately 12.3s."
-                ),
-                "recommended_action": "PRE_WARM_CACHE_AND_THROTTLE",
-                "recalled_incident": None,
-                "thought_chain": [
-                    "[THOUGHT 1] Sentinel scanning operational sliding window: last 15s.",
-                    "[OBSERVATION 1] Steady upward velocity drift from 10.0 to 22.0 tx/s.",
-                    "[TAIL FORECAST] Extrapolation models breach of 30 TPS ceiling in 12.3s.",
-                    "[SENTINEL VERDICT] DRIFT WARNING. Pre-warming Redis cache and alert SecOps."
-                ]
-            }
-        else: # normal
+        if scenario == "normal":
             return self.evaluate_telemetry(window_seconds=15)
 
-        self.current_state = result
-        self.current_verdict = result["verdict"]
-        self.evaluation_history.append({
-            "time": time.strftime("%H:%M:%S"),
-            "tps": result["tps"],
-            "forecast_t30": result["tail_forecast_t30"],
-            "verdict": result["verdict"],
-            "clusters": result["concurrency_clusters"]
-        })
+        if scenario not in ("flash_sale", "toctou_attack", "drift_accelerate"):
+            scenario = "flash_sale"
+
+        window_seconds = 15
+        now = time.time()
+        now_ms = int(now * 1000)
+        events, policies = self._build_scenario_events(scenario, now_ms, window_seconds)
+
+        # Anchor the derivative calculation so the synthetic scenario is reproducible.
+        self.last_tps = 10.0
+        self.last_eval_time = now - window_seconds
+
+        result = self.evaluate_telemetry(
+            window_seconds=window_seconds,
+            events_override=events,
+            policies_override=policies,
+            now_override=now,
+        )
+        result["scenario"] = scenario
         return result
 
 

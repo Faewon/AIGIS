@@ -4,6 +4,7 @@ Chuyển đổi câu hỏi ngôn ngữ tự nhiên (Tiếng Việt & Tiếng Anh
 Hỗ trợ cả LLM (Gemini, Groq, Llama, OpenAI) và Heuristic Semantic Parser offline.
 """
 
+import asyncio
 import re
 import json
 import time
@@ -11,15 +12,20 @@ from typing import Dict, Any, List
 from .llm_engine import global_llm_engine
 from .database import execute_raw_sql, get_table_schema, get_db_tables, get_active_db_info
 
+
+def _has_kw(text: str, keywords: List[str]) -> bool:
+    """Whole-word match so e.g. "ip" does not fire inside "description"."""
+    return any(re.search(r"(?<!\w)" + re.escape(k) + r"(?!\w)", text) for k in keywords)
+
 SCHEMA_DOCUMENTATION = """
 Bảng 'telemetry' chứa dữ liệu lưu lượng mạng & giao dịch FinTech (1,000,000 bản ghi):
 - event_id (TEXT PRIMARY KEY): Mã định danh duy nhất của sự kiện (ví dụ: 'EVT-AIGIS-00000001')
 - timestamp (TEXT): Chuỗi thời gian ISO microsecond (ví dụ: '2026-10-25 12:00:00.025000')
 - epoch_ms (INTEGER): Timestamp thời gian thực dạng mili-giây
-- user_id (TEXT): Định danh khách hàng (ví dụ: 'usr_customer_52883')
+- user_id (TEXT): Định danh khách hàng (xem giá trị ở cuối tài liệu)
 - session_id (TEXT): Phiên làm việc
 - account_age_days (INTEGER): Tuổi đời tài khoản (ngày)
-- kyc_level (TEXT): Cấp độ xác minh danh tính ('NONE', 'BASIC', 'VERIFIED_TIER_2')
+- kyc_level (TEXT): Cấp độ xác minh danh tính (xem giá trị ở cuối tài liệu)
 - credit_score (INTEGER): Điểm tín dụng (300-850)
 - client_ip (TEXT): Địa chỉ IP nguồn của client
 - ip_country (TEXT): Quốc gia nguồn (VN, US, SG, JP, DE, CN, ...)
@@ -41,7 +47,9 @@ Bảng 'telemetry' chứa dữ liệu lưu lượng mạng & giao dịch FinTech
 - status_code_unpatched (INTEGER): Mã HTTP trả về TRƯỚC KHI VÁ LỖI (200 là thành công/bị khai thác, 400 là từ chối)
 - status_code_patched (INTEGER): Mã HTTP trả về SAU KHI VÁ LỖI (429 là bị chặn đứng bởi Aegis Idempotency Guard)
 - is_attack (INTEGER): 1 nếu là sự kiện tấn công bảo mật logic, 0 nếu là lưu lượng khách hàng bình thường
-- attack_type (TEXT): 'RACE_CONDITION_BURST', 'CREDENTIAL_STUFFING', 'SHADOW_API_PROBE', hoặc 'BENIGN'
+- attack_type (TEXT): batch dataset: 'RACE_CONDITION_BURST', 'CREDENTIAL_STUFFING', 'SHADOW_API_PROBE'; live stream: 'TOCTOU_RACE_CONDITION', 'BOLA_IDOR', 'NEGATIVE_AMOUNT_TAMPERING', 'STEP_SKIPPING_STATE_BYPASS'; benign rows: 'BENIGN'
+- kyc_level (TEXT): 'UNVERIFIED', 'TIER_1_BASIC', 'TIER_2_VERIFIED', 'VIP_ENTERPRISE'
+- user_id (TEXT): batch dataset 'usr_customer_NNNNN' / 'usr_botnet_cerebrus_NNN'; live stream 'USR_VN_NNNNN'
 """
 
 def heuristic_nl2sql(prompt: str) -> Dict[str, str]:
@@ -49,8 +57,8 @@ def heuristic_nl2sql(prompt: str) -> Dict[str, str]:
     p = prompt.lower().strip()
     
     # 1. Top countries by theft / attacks
-    if any(k in p for k in ["quốc gia", "country", "countries"]):
-        if any(k in p for k in ["tiền", "thiệt hại", "usd", "stolen", "drained", "theft", "loss"]):
+    if _has_kw(p, ["quốc gia", "country", "countries"]):
+        if _has_kw(p, ["tiền", "thiệt hại", "usd", "stolen", "drained", "theft", "loss"]):
             return {
                 "sql": "SELECT ip_country, COUNT(*) as attack_events, SUM(transaction_amount_usd) as total_stolen_usd FROM telemetry WHERE is_attack = 1 GROUP BY ip_country ORDER BY total_stolen_usd DESC LIMIT 10;",
                 "explanation": "Grouped attack events by source country and aggregated total financial theft in USD, ordered by loss descending (Top 10)."
@@ -61,49 +69,49 @@ def heuristic_nl2sql(prompt: str) -> Dict[str, str]:
         }
         
     # 2. Datacenter Proxy / ISP
-    if any(k in p for k in ["proxy", "datacenter", "isp", "nhà mạng", "ip"]):
+    if _has_kw(p, ["proxy", "datacenter", "isp", "nhà mạng", "ip"]):
         return {
             "sql": "SELECT ip_isp, ip_country, COUNT(*) as attack_count, SUM(transaction_amount_usd) as total_usd FROM telemetry WHERE is_attack = 1 AND is_datacenter_proxy = 1 GROUP BY ip_isp, ip_country ORDER BY attack_count DESC LIMIT 10;",
             "explanation": "Identified Datacenter Proxy ISPs with the highest concentration of malicious exploit requests."
         }
         
     # 3. Top exploited users / accounts
-    if any(k in p for k in ["user", "users", "người dùng", "tài khoản", "account", "accounts"]):
+    if _has_kw(p, ["user", "users", "người dùng", "tài khoản", "account", "accounts"]):
         return {
             "sql": "SELECT user_id, COUNT(*) as exploit_attempts, SUM(transaction_amount_usd) as drained_usd, MIN(timestamp) as first_seen FROM telemetry WHERE is_attack = 1 GROUP BY user_id ORDER BY exploit_attempts DESC LIMIT 10;",
             "explanation": "Analyzed account abuse frequency by grouping attack events per user ID with cumulative financial impact."
         }
         
     # 4. Latency / RTT
-    if any(k in p for k in ["độ trễ", "latency", "rtt", "thời gian phản hồi", "response time"]):
+    if _has_kw(p, ["độ trễ", "latency", "rtt", "thời gian phản hồi", "response time"]):
         return {
             "sql": "SELECT api_endpoint, is_attack, COUNT(*) as req_count, ROUND(AVG(network_rtt_ms), 2) as avg_rtt_ms, ROUND(MAX(network_rtt_ms), 2) as max_rtt_ms FROM telemetry GROUP BY api_endpoint, is_attack ORDER BY avg_rtt_ms DESC;",
             "explanation": "Compared average and peak network round-trip time (RTT) between benign traffic and attack requests across endpoints."
         }
         
     # 5. Attack Types breakdown
-    if any(k in p for k in ["loại", "loại hình", "attack type", "phân loại", "chiến thuật", "types", "tactics"]):
+    if _has_kw(p, ["loại", "loại hình", "attack type", "phân loại", "chiến thuật", "types", "tactics"]):
         return {
             "sql": "SELECT attack_type, COUNT(*) as total_events, SUM(transaction_amount_usd) as total_usd, ROUND(AVG(network_rtt_ms), 2) as avg_rtt_ms FROM telemetry GROUP BY attack_type ORDER BY total_events DESC;",
             "explanation": "Categorized overall telemetry traffic across attack techniques and benign customer activity."
         }
         
     # 6. Race Condition / Concurrency / Burst stream
-    if any(k in p for k in ["race condition", "đua lệnh", "burst", "concurrency", "đồng thời", "đa luồng", "simultaneous"]):
+    if _has_kw(p, ["race condition", "đua lệnh", "burst", "concurrency", "đồng thời", "đa luồng", "simultaneous"]):
         return {
             "sql": "SELECT burst_stream_id, COUNT(*) as concurrency_packets, MIN(timestamp) as burst_start, ROUND(AVG(network_rtt_ms), 2) as avg_rtt FROM telemetry WHERE is_attack = 1 AND burst_stream_id != 'NONE' GROUP BY burst_stream_id ORDER BY concurrency_packets DESC LIMIT 10;",
             "explanation": "Traced multi-stream concurrency attacks (Race Condition bursts) with highest simultaneous packet arrival counts."
         }
         
     # 7. Financial exposure / Theft / Voucher drain
-    if any(k in p for k in ["tiền", "thất thoát", "chiếm đoạt", "voucher", "drained", "theft", "stolen", "bảo vệ", "exposure"]):
+    if _has_kw(p, ["tiền", "thất thoát", "chiếm đoạt", "voucher", "drained", "theft", "stolen", "bảo vệ", "exposure"]):
         return {
             "sql": "SELECT api_endpoint, COUNT(*) as exploit_count, SUM(transaction_amount_usd) as unpatched_theft_usd FROM telemetry WHERE is_attack = 1 AND status_code_unpatched = 200 GROUP BY api_endpoint ORDER BY unpatched_theft_usd DESC;",
             "explanation": "Aggregated vulnerable endpoints successfully exploited for balance/voucher drainage prior to patch deployment."
         }
         
     # 8. Benign vs Attack ratio
-    if any(k in p for k in ["tỷ lệ", "ratio", "benign", "bình thường", "tổng", "percentage", "breakdown"]):
+    if _has_kw(p, ["tỷ lệ", "ratio", "benign", "bình thường", "tổng", "percentage", "breakdown"]):
         return {
             "sql": "SELECT CASE WHEN is_attack = 1 THEN 'ATTACK' ELSE 'BENIGN' END as traffic_type, COUNT(*) as total_records, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM telemetry), 2) as percentage, ROUND(SUM(transaction_amount_usd), 2) as total_volume_usd FROM telemetry GROUP BY is_attack;",
             "explanation": "Calculated distribution ratio and volume comparison between legitimate customer traffic and adversarial attacks."
@@ -214,10 +222,10 @@ CRITICAL RULES:
         explanation = heuristic_res["explanation"]
         model_name = "Autonomous Heuristic NL2SQL Engine"
 
-    # 3. Thực thi truy vấn nếu được yêu cầu
+    # 3. Thực thi truy vấn nếu được yêu cầu (không chặn event loop)
     query_result = {}
     if execute:
-        query_result = execute_raw_sql(sql_query, max_limit=50)
+        query_result = await asyncio.to_thread(execute_raw_sql, sql_query, 50)
 
     elapsed = time.time() - t0
 

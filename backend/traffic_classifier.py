@@ -2,7 +2,19 @@ import os
 import sqlite3
 import time
 from typing import Dict, Any, List, Optional
-from .database import get_connection, get_db_tables, ACTIVE_DB_PATH, ACTIVE_DB_NAME
+from .database import get_connection, get_db_tables, get_active_db_info
+
+
+def _quote_table(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def _label_to_bool(value: Any) -> Optional[bool]:
+    if value in (1, "1", True, "true", "True"):
+        return True
+    if value in (0, "0", False, "false", "False"):
+        return False
+    return None
 
 def classify_traffic_row(row: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -10,9 +22,8 @@ def classify_traffic_row(row: Dict[str, Any]) -> Dict[str, Any]:
     Phân tích đa chiều các vector an ninh viễn trắc để tự động xác định
     và phân loại chính xác ATTACK EVENT vs BENIGN TRAFFIC.
     """
-    # 0. Nếu record đã có trường is_attack từ ground truth
-    ground_truth = row.get("is_attack")
-    
+    # Classification uses observable telemetry features only. The ground-truth
+    # `is_attack` column is reserved for offline accuracy evaluation below.
     score = 0.0
     reasons = []
 
@@ -57,23 +68,13 @@ def classify_traffic_row(row: Dict[str, Any]) -> Dict[str, Any]:
             score += 0.20
             reasons.append("Unprotected state mutation: Missing Idempotency Key")
 
-    # Vector 5: Account Status
-    user_id = str(row.get("user_id", "") or "")
-    if "botnet" in user_id.lower() or "attacker" in user_id.lower():
-        score += 0.40
-        reasons.append(f"Known adversarial actor identity: {user_id}")
-
-    # Cross-check ground truth if available
-    if ground_truth in (1, "1", True):
-        score = max(score, 0.85)
-    elif ground_truth in (0, "0", False) and not is_burst and not is_bot_ua and is_proxy not in (1, "1"):
-        score = min(score, 0.15)
+    # user_id is deliberately NOT a feature: the simulator names attackers
+    # "usr_botnet_*", so matching on it would leak the ground-truth label.
 
     score = min(1.0, round(score, 3))
     is_attack = score >= 0.45
 
     if is_attack:
-        confidence = round(85.0 + score * 14.5, 1)
         if is_burst:
             attack_type = "HTTP/2_RACE_CONDITION"
         elif is_bot_ua or is_proxy in (1, "1", True, "true"):
@@ -83,7 +84,6 @@ def classify_traffic_row(row: Dict[str, Any]) -> Dict[str, Any]:
         else:
             attack_type = "ANOMALOUS_VELOCITY_BURST"
     else:
-        confidence = round(92.0 + (1.0 - score) * 7.5, 1)
         attack_type = "BENIGN"
         reasons = ["Normal consumer browsing & legitimate purchase flow"]
 
@@ -92,7 +92,8 @@ def classify_traffic_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "label": "ATTACK" if is_attack else "BENIGN",
         "attack_type": attack_type,
         "anomaly_score": score,
-        "confidence_pct": confidence,
+        "confidence_pct": None,
+        "confidence_method": "NOT_CALIBRATED",
         "reasons": reasons
     }
 
@@ -101,28 +102,30 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
     Quét cơ sở dữ liệu hiện hành và tự động xác định Benign vs Attack
     kèm báo cáo phân bổ và độ tin cậy của mô hình AI.
     """
-    if not os.path.exists(ACTIVE_DB_PATH):
-        return {"success": False, "error": f"Database not found: {ACTIVE_DB_PATH}"}
+    db_info = get_active_db_info()
+    active_path = db_info.get("active_db_path")
+    if not active_path or not os.path.exists(active_path):
+        return {"success": False, "error": f"Database not found: {active_path}"}
 
+    sample_limit = max(1, min(int(sample_limit), 50000))
     conn = get_connection()
     cur = conn.cursor()
 
     try:
         tables = get_db_tables()
         if not tables:
-            conn.close()
             return {"success": False, "error": "No tables found in database."}
 
         target_table = "telemetry" if "telemetry" in tables else tables[0]
+        quoted_table = _quote_table(target_table)
 
         # Count total rows
-        cur.execute(f'SELECT COUNT(*) FROM "{target_table}"')
+        cur.execute(f"SELECT COUNT(*) FROM {quoted_table}")
         total_in_db = cur.fetchone()[0]
 
         # Fetch sample
-        cur.execute(f'SELECT * FROM "{target_table}" LIMIT ?', (sample_limit,))
+        cur.execute(f"SELECT * FROM {quoted_table} LIMIT ?", (sample_limit,))
         rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
 
         if not rows:
             return {"success": False, "error": "Table has no records to classify."}
@@ -133,6 +136,8 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
         attack_types: Dict[str, int] = {}
         flagged_users: Dict[str, int] = {}
         flagged_ips: Dict[str, int] = {}
+        labeled_count = 0
+        labeled_correct = 0
 
         for r in rows:
             res = classify_traffic_row(r)
@@ -150,6 +155,12 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
             else:
                 benign_count += 1
 
+            actual = _label_to_bool(r.get("is_attack"))
+            if actual is not None:
+                labeled_count += 1
+                if actual == res["is_attack"]:
+                    labeled_correct += 1
+
         elapsed = round((time.time() - t0) * 1000, 2)
         sample_size = len(rows)
         attack_ratio = attack_count / sample_size if sample_size else 0.0
@@ -160,9 +171,14 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
         top_ips = sorted(flagged_ips.items(), key=lambda x: x[1], reverse=True)[:5]
         top_users = sorted(flagged_users.items(), key=lambda x: x[1], reverse=True)[:5]
 
+        if labeled_count:
+            classification_accuracy = f"{round(labeled_correct / labeled_count * 100, 2)}%"
+        else:
+            classification_accuracy = "NOT_EVALUATED"
+
         return {
             "success": True,
-            "database_name": ACTIVE_DB_NAME,
+            "database_name": db_info.get("active_db_name"),
             "target_table": target_table,
             "total_records_in_db": total_in_db,
             "sample_analyzed": sample_size,
@@ -171,20 +187,22 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
             "attack_percentage": round(attack_ratio * 100, 2),
             "projected_benign_total": projected_benign,
             "projected_attack_total": projected_attacks,
-            "classification_accuracy": "99.4%",
+            "classification_accuracy": classification_accuracy,
+            "accuracy_evaluated_on": labeled_count,
             "processing_time_ms": elapsed,
             "attack_type_breakdown": attack_types,
             "top_flagged_ips": [{"ip": item[0], "count": item[1]} for item in top_ips],
             "top_flagged_users": [{"user_id": item[0], "count": item[1]} for item in top_users],
             "verdict": (
-                f"AIGIS Autonomous Traffic Classifier analyzed {sample_size:,} records in {elapsed}ms. "
-                f"Identified {attack_count:,} malicious attack events ({round(attack_ratio*100, 2)}%) "
-                f"and {benign_count:,} legitimate consumer sessions ({round((1-attack_ratio)*100, 2)}%)."
+                f"Heuristic classifier analyzed {sample_size:,} sampled records in {elapsed}ms. "
+                f"It flagged {attack_count:,} events ({round(attack_ratio*100, 2)}%) as attack-like and "
+                f"{benign_count:,} as benign. Accuracy is only reported when ground-truth labels are present."
             )
         }
     except Exception as e:
-        conn.close()
         return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
 
 
 async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable_llm: bool = True) -> Dict[str, Any]:
@@ -193,12 +211,15 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
     Thực hiện phân tích đa tầng (Multi-Stage Deep Forensics):
     - Giai đoạn 1: Trích xuất chuỗi thời gian & ma trận vận tốc đồng bộ (Sub-ms Concurrency Matrix)
     - Giai đoạn 2: Lập hồ sơ thực thể (JA3 TLS, Datacenter ASN, User-Agent Entropy)
-    - Giai đoạn 3: Đối chiếu khung phòng thủ MITRE ATT&CK (T1499.004, T1110.001)
+    - Giai đoạn 3: Đối chiếu heuristic với khung MITRE ATT&CK (không phải chẩn đoán chính thức)
     - Giai đoạn 4: Tổng hợp báo cáo điều tra số (Forensic Intelligence Dossier) & Playbook vá lỗi
     """
-    if not os.path.exists(ACTIVE_DB_PATH):
-        return {"success": False, "error": f"Database not found: {ACTIVE_DB_PATH}"}
+    db_info = get_active_db_info()
+    active_path = db_info.get("active_db_path")
+    if not active_path or not os.path.exists(active_path):
+        return {"success": False, "error": f"Database not found: {active_path}"}
 
+    sample_limit = max(1, min(int(sample_limit), 50000))
     t_start = time.time()
     conn = get_connection()
     cur = conn.cursor()
@@ -206,13 +227,13 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
     try:
         tables = get_db_tables()
         target_table = "telemetry" if "telemetry" in tables else tables[0]
+        quoted_table = _quote_table(target_table)
 
-        cur.execute(f'SELECT COUNT(*) FROM "{target_table}"')
+        cur.execute(f"SELECT COUNT(*) FROM {quoted_table}")
         total_in_db = cur.fetchone()[0]
 
-        cur.execute(f'SELECT * FROM "{target_table}" LIMIT ?', (sample_limit,))
+        cur.execute(f"SELECT * FROM {quoted_table} LIMIT ?", (sample_limit,))
         rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
 
         if not rows:
             return {"success": False, "error": "No records available for deep dive."}
@@ -269,31 +290,29 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
             reverse=True
         )[:5]
 
-        # MITRE ATT&CK Matrix Mapping
+        # Heuristic MITRE ATT&CK mapping. These are suggested categories, not a
+        # validated attribution or vulnerability assessment.
         mitre_mappings = [
             {
-                "technique_id": "T1499.004",
-                "technique_name": "HTTP/2 Single-Packet Race Condition Burst",
-                "severity": "CRITICAL",
-                "cvss_score": 8.8,
+                "technique_id": "T1190",
+                "technique_name": "Exploit Public-Facing Application",
+                "severity": "INFO",
                 "detected_events": attack_types.get("HTTP/2_RACE_CONDITION", 0),
-                "description": "Attacker multiplexes 15-30 concurrent streams inside a single TCP frame to defeat balance check latency windows."
+                "description": "Concurrent requests target a state-changing voucher endpoint. Mapping is heuristic."
             },
             {
-                "technique_id": "T1110.001",
-                "technique_name": "Distributed Sybil Asset Harvesting",
-                "severity": "HIGH",
-                "cvss_score": 7.4,
+                "technique_id": "T1585",
+                "technique_name": "Establish Accounts",
+                "severity": "INFO",
                 "detected_events": attack_types.get("DATACENTER_PROXY_BOT", 0),
-                "description": "Multi-identity bot accounts operating from datacenter cloud ranges (AWS/Linode/Hetzner) to harvest digital coupons."
+                "description": "Multiple identities appear to originate from hosting infrastructure. Mapping is heuristic."
             },
             {
-                "technique_id": "T1059.006",
-                "technique_name": "Unpublished Shadow Route Direct Execution",
-                "severity": "MEDIUM",
-                "cvss_score": 6.2,
+                "technique_id": "T1190",
+                "technique_name": "Exploit Public-Facing Application",
+                "severity": "INFO",
                 "detected_events": attack_types.get("SHADOW_API_HARVEST", 0),
-                "description": "Direct HTTP POST invocation of unlisted internal checkout endpoints bypassing cart state verification."
+                "description": "Requests hit an unlisted checkout route. Mapping is heuristic."
             }
         ]
 
@@ -302,28 +321,26 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
             {
                 "layer": "API Gateway / NGINX",
                 "rule": "limit_req_zone $binary_remote_addr zone=voucher_burst:10m rate=5r/s; limit_req zone=voucher_burst burst=5 nodelay;",
-                "target": "Mitigates TCP burst multiplexing and fast-drops sub-millisecond flood."
+                "target": "Reduces burst throughput; tune against legitimate traffic and monitor false positives."
             },
             {
                 "layer": "Application Middleware (Aegis)",
                 "rule": "Redis SET NX (lock:claim:{user_id}) with 3.0s lease TTL & atomic idempotency token validation.",
-                "target": "Completely eliminates TOCTOU race condition window in SQLite/PostgreSQL."
+                "target": "Serializes concurrent claims for the same authenticated user; it does not replace transaction-level constraints."
             },
             {
                 "layer": "Infrastructure Firewall",
-                "rule": "Block / Flag ingress traffic from known cloud hosting ASNs (Linode ASN 63949, Hetzner ASN 24940) targeting payment routes.",
-                "target": "Stops 100% of proxy botnet nodes without affecting residential ISP users (VNPT, Viettel, FPT)."
+                "rule": "Flag ingress traffic from hosting ASNs (for example Linode ASN 63949, Hetzner ASN 24940) targeting payment routes for review.",
+                "target": "Reduces some bot traffic but can affect legitimate cloud users; use as a signal, not a blanket block."
             }
         ]
 
-        # Forensic Narrative
+        # Forensic Narrative (measured sample, no invented certainty)
         narrative = (
-            f"AIGIS Deep-Dive Forensics examined {sample_size:,} telemetry records. "
-            f"The analysis revealed a coordinated, automated offensive campaign targeting business logic flaws on "
-            f"'/api/v1/voucher/claim'. Attackers deployed HTTP/2 multiplexed packet synchronization across {len(rogue_ips)} "
-            f"distinct cloud hosting IP addresses. Over {attack_count:,} unauthorized claim bursts were flagged with 99.4% "
-            f"statistical certainty. Projected total exposure across the 1,000,000 row dataset exceeds ${attack_count * 500:,.2f} "
-            f"if left unmitigated."
+            f"AIGIS Deep-Dive Forensics examined a sample of {sample_size:,} telemetry records. "
+            f"The heuristic classifier flagged {attack_count:,} events ({round(attack_ratio * 100, 2)}%) "
+            f"as attack-like across {len(rogue_ips)} distinct client IPs. This is a demo classification, "
+            f"not a statistical certainty or a confirmed attribution."
         )
 
         elapsed_ms = round((time.time() - t_start) * 1000, 2)
@@ -338,8 +355,8 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
             "attack_percentage": round(attack_ratio * 100, 2),
             "projected_attack_total": projected_attacks,
             "projected_benign_total": projected_benign,
-            "threat_posture_score": 96.8,
-            "posture_rating": "CRITICAL RISK DETECTED",
+            "threat_posture_score": None,
+            "posture_rating": "DEMO_ONLY",
             "processing_time_ms": elapsed_ms,
             "mitre_mappings": mitre_mappings,
             "top_rogue_ips": sorted_rogue_ips,
@@ -347,5 +364,6 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
             "executive_narrative": narrative
         }
     except Exception as e:
-        conn.close()
         return {"success": False, "error": str(e)}
+    finally:
+        conn.close()

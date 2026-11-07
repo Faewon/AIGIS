@@ -23,13 +23,17 @@ class BlueAegisAgent:
         )
 
     async def analyze_and_synthesize_patch(self, sandbox_report: Dict[str, Any]) -> Dict[str, Any]:
-        stolen = sandbox_report.get("total_stolen_amount", 7500.0)
-        requests_count = sandbox_report.get("successful_requests", 15)
+        stolen = float(sandbox_report.get("total_stolen_amount") or 0.0)
+        requests_count = int(sandbox_report.get("successful_requests") or 0)
+        total_requests = int(sandbox_report.get("total_requests") or sandbox_report.get("total_burst_count") or 0)
 
         thought_chain = []
-        thought_chain.append(f"[THOUGHT 1] Ingested Sandbox execution crash telemetry: {requests_count} duplicate claims executed concurrently, draining ${stolen:,.2f}.")
-        thought_chain.append("[ROOT CAUSE ANALYSIS] Detected classic Time-of-Check to Time-of-Use (TOCTOU) gap between SELECT balance check and UPDATE transaction commit.")
-        thought_chain.append("[DEFENSIVE STRATEGY] Synthesizing sub-millisecond atomic locking middleware using Redis SET NX (Not Exists) with a 3.0s lease TTL.")
+        thought_chain.append(
+            f"[THOUGHT 1] Ingested Sandbox report: {requests_count}/{total_requests} requests succeeded, "
+            f"measured unauthorized value ${stolen:,.2f}."
+        )
+        thought_chain.append("[ROOT CAUSE ANALYSIS] Observed a Time-of-Check to Time-of-Use (TOCTOU) pattern: concurrent requests can pass the quota check before the first commit.")
+        thought_chain.append("[DEFENSIVE STRATEGY] Synthesizing an idempotency/locking middleware template using Redis SET NX with a short lease TTL.")
 
         llm_status = global_llm_engine.get_status()
         patch_code = ""
@@ -56,30 +60,47 @@ class BlueAegisAgent:
         if not patch_code:
             thought_chain.append("[AUTONOMOUS SYNTHESIS] Synthesizing high-performance Redis Distributed Lock Middleware.")
             patch_code = """# ==============================================================================
-# AIGIS BLUE TEAM (AEGIS) — AUTONOMOUS IDEMPOTENCY GUARD MIDDLEWARE
-# Tự động gài Redis Distributed Lock để triệt tiêu Race Condition
+# AIGIS BLUE TEAM (AEGIS) — REFERENCE IDEMPOTENCY GUARD MIDDLEWARE
+# This is a template shown in the UI; it is not executed by the demo server.
+# Requires an upstream authentication middleware that sets request.state.user_id.
 # ==============================================================================
 
-from fastapi import Request, HTTPException
+from fastapi import Request
 from fastapi.responses import JSONResponse
-import time
+import os
+import secrets
+import redis.asyncio as aioredis
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = aioredis.from_url(REDIS_URL)
+
+_RELEASE_LOCK_LUA = '''
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+end
+return 0
+'''
 
 class RedisIdempotencyMiddleware:
-    def __init__(self, app, redis_client=None, lock_ttl_sec: float = 3.0):
+    def __init__(self, app, lock_ttl_sec: float = 3.0):
         self.app = app
         self.lock_ttl_sec = lock_ttl_sec
-        # Trong môi trường production, sử dụng Redis SET lock_key 1 NX EX ttl
-        self._local_locks = {}
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope["path"] == "/api/v1/voucher/claim":
-            headers = dict(scope.get("headers", []))
-            user_id = headers.get(b"x-user-id", b"anonymous").decode("utf-8")
-            lock_key = f"lock:claim:{user_id}"
-            now = time.time()
+        if scope["type"] == "http" and scope["path"] == "/api/v1/voucher/claim" and scope["method"] == "POST":
+            # In a real ASGI app, read the authenticated identity established by
+            # earlier middleware; never trust a client-supplied X-User-ID header.
+            state = scope.get("state") or {}
+            user_id = state.get("user_id")
+            if not user_id:
+                response = JSONResponse(status_code=401, content={"success": False, "error": "Unauthenticated"})
+                await response(scope, receive, send)
+                return
 
-            # Thử chiếm khóa nguyên tử (Atomic Lock Acquisition)
-            if lock_key in self._local_locks and (now - self._local_locks[lock_key]) < self.lock_ttl_sec:
+            lock_key = f"aigis:lock:claim:{user_id}"
+            lock_value = secrets.token_hex(16)
+            acquired = await redis_client.set(lock_key, lock_value, nx=True, ex=self.lock_ttl_sec)
+            if not acquired:
                 response = JSONResponse(
                     status_code=429,
                     content={
@@ -90,8 +111,11 @@ class RedisIdempotencyMiddleware:
                 )
                 await response(scope, receive, send)
                 return
-
-            self._local_locks[lock_key] = now
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                await redis_client.eval(_RELEASE_LOCK_LUA, 1, lock_key, lock_value)
+            return
 
         await self.app(scope, receive, send)
 """
@@ -117,8 +141,8 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
     if claims >= 1:
         return {"success": False, "error": "Voucher quota already reached"}
 
-    # [CRITICAL TOCTOU EXPLOIT WINDOW: 0.5ms - 5.0ms]
-    # Single-Packet burst (15 concurrent HTTP/2 requests) enters here simultaneously!
+    # [CRITICAL TOCTOU EXPLOIT WINDOW]
+    # Concurrent requests can enter this read/write gap simultaneously.
 
     # STEP 2: Time-of-Use (Delayed balance update)
     await db.execute(
@@ -130,55 +154,74 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
 
         root_cause = (
             "VULNERABILITY: Concurrency Time-of-Check to Time-of-Use (TOCTOU) Race Condition.\n"
-            "ROOT CAUSE: Microservice verifies user quota (SELECT) and updates balance (UPDATE) "
-            "in two discrete steps without Distributed Mutex Locks or Idempotency Guards. When 15 requests arrive "
-            "at the server within the same millisecond, all pass the check (claims < 1) before the first transaction commits."
+            "ROOT CAUSE: The mock target verifies a user's quota (read) and updates the claim state (write) "
+            "in separate steps without a per-user atomic guard. Concurrent requests can all observe the pre-commit "
+            "state; the measured number of successful duplicate claims is reported by the sandbox rather than assumed."
         )
 
         return {
             "agent": "Auto-Remediator",
-            "agent_role": "Agent 4: Auto-Remediator (Autonomous Distributed Lock Patch Synthesis)",
+            "agent_role": "Agent 4: Auto-Remediator (Distributed Lock Patch Synthesis)",
             "model_engine": f"{llm_status['provider']} ({llm_status['model_name']})",
-            "status": "PATCH_SYNTHESIZED_AND_DEPLOYED",
+            "status": "SIMULATED_PATCH_DEPLOYED",
             "thought_chain": thought_chain,
             "root_cause_analysis": root_cause,
             "patch_strategy": "REDIS_DISTRIBUTED_LOCK_AND_IDEMPOTENCY_GUARD",
             "patch_code": patch_code,
             "vulnerable_code": vulnerable_code,
-            "remediation_status": "Virtual patch has been hot-reloaded into Sandbox Runtime.",
-            "next_step": "Trigger exploit re-test and execute Zero-Regression Benchmark."
+            "remediation_status": "Patch flag enabled in the in-process mock target; no production system was modified.",
+            "next_step": "Trigger exploit re-test and execute the zero-regression benchmark."
         }
 
     async def run_zero_regression_test(self, sample_users: int = 50) -> Dict[str, Any]:
         """
-        Kiểm tra độ hồi quy (Zero-Regression Check):
-        Giả lập 50 người dùng bình thường mua sắm liên tiếp để đảm bảo:
-        - Bản vá KHÔNG chặn nhầm khách hợp lệ.
-        - Độ trễ tăng thêm không đáng kể (< 2ms).
+        Measure legitimate-user behavior with and without the patch enabled.
+        No hard-coded latency or false-positive numbers are used.
         """
-        latencies = []
-        approved_count = 0
+        sample_users = max(1, min(int(sample_users), 500))
+        mock_store.reset(preserve_patches=True)
+        original_enabled = mock_store.patch_enabled
+        original_modules = dict(mock_store.patch_modules)
 
-        for i in range(sample_users):
-            user_id = f"usr_legit_customer_{i+1:03d}"
-            t0 = time.time()
-            res = await mock_store.claim_voucher(user_id=user_id, voucher_code="TET2026_NORMAL", amount=10.0)
-            latency_ms = (time.time() - t0) * 1000.0
-            latencies.append(latency_ms)
-            if res.get("status_code") == 200:
-                approved_count += 1
+        async def measure(prefix: str, patch_enabled: bool):
+            mock_store.set_all_patches(patch_enabled)
+            latencies = []
+            approved = 0
+            for i in range(sample_users):
+                user_id = f"{prefix}_{i+1:03d}"
+                t0 = time.time()
+                res = await mock_store.claim_voucher(user_id=user_id, voucher_code="TET2026_NORMAL", amount=10.0)
+                latencies.append((time.time() - t0) * 1000.0)
+                if res.get("status_code") == 200:
+                    approved += 1
+            avg = sum(latencies) / len(latencies) if latencies else 0.0
+            return approved, avg
 
-        avg_latency_ms = sum(latencies) / len(latencies) if latencies else 0.0
-        # Trừ đi 20.0ms thời gian cơ sở của I/O DB query để ra độ trễ overhead thực tế do patch middleware
-        overhead_ms = max(0.2, avg_latency_ms - 20.0) if avg_latency_ms >= 20.0 else avg_latency_ms
+        try:
+            baseline_approved, baseline_avg = await measure("usr_legit_baseline", False)
+            patched_approved, patched_avg = await measure("usr_legit_patched", True)
+        finally:
+            mock_store.patch_enabled = original_enabled
+            mock_store.patch_modules = original_modules
+
+        false_positive_rate = round((sample_users - patched_approved) / sample_users * 100.0, 2)
+        overhead_ms = round(patched_avg - baseline_avg, 2)
+        passed = patched_approved == sample_users and overhead_ms <= 2.0
 
         return {
             "agent": "Auto-Remediator",
-            "status": "ZERO_REGRESSION_VERIFIED",
+            "status": "ZERO_REGRESSION_VERIFIED" if passed else "REGRESSION_DETECTED",
             "sample_users_tested": sample_users,
-            "legitimate_requests_approved": approved_count,
-            "false_positive_rate": "0.0%",
-            "total_latency_ms": round(avg_latency_ms, 2),
-            "latency_overhead_ms": round(overhead_ms, 2),
-            "verdict": "PASSED — Zero Regression Confirmed. Ready for Production Release."
+            "legitimate_requests_approved": patched_approved,
+            "baseline_requests_approved": baseline_approved,
+            "false_positive_rate": f"{false_positive_rate:.2f}%",
+            "baseline_latency_ms": round(baseline_avg, 2),
+            "patched_latency_ms": round(patched_avg, 2),
+            "total_latency_ms": round(patched_avg, 2),
+            "latency_overhead_ms": overhead_ms,
+            "verdict": (
+                "PASSED — legitimate requests were approved and measured latency overhead stayed within the 2.0ms target."
+                if passed else
+                "FAILED — legitimate requests were rejected or measured latency overhead exceeded the 2.0ms target."
+            )
         }
