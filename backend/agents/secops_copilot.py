@@ -33,22 +33,22 @@ except (ImportError, ModuleNotFoundError):
 class SecOpsCopilotAgent:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
-        self.agent_name = "SecOps Copilot"
-        self.agent_role = "Autonomous Security Operations Copilot & Handoff Coordinator"
+        self.agent_name = "AI Assistant"
+        self.agent_role = "Autonomous Security Operations Assistant & Handoff Coordinator"
         self.system_prompt = (
-            "You are the SecOps Copilot in the AIGIS FinTech Security Platform, inspired by ARIA's Q&A agent. "
-            "You help security operations teams understand system health, telemetry drift, past incident memory, "
-            "and business logic vulnerabilities. When questions require deep mathematical diagnosis, you autonomously "
-            "hand off the task to the Deep Quant Investigator and explain the findings in crisp, executive Vietnamese with full diacritics."
+            "You are the AI Assistant in the AIGIS FinTech Security Platform, inspired by ARIA's Q&A agent. "
+            "You help security operators understand real-time telemetry anomalies, explain Sentinel status, "
+            "trigger deep quant investigations in the Python sandbox, and formulate SecOps Work Orders. "
+            "Answer clearly and concisely in professional English with Markdown formatting."
         )
 
     async def answer_query(self, query: str) -> Dict[str, Any]:
         """
-        Xử lý câu hỏi của Operator và điều phối handoff nếu cần thiết:
-        1. Nhận diện ý định (Intent Classification)
-        2. Truy vấn thông tin thời gian thực từ Sentinel, KB và Telemetry
-        3. Ủy quyền (Handoff) cho Deep Quant Investigator nếu cần chẩn đoán vi mô
-        4. Trả về phản hồi trực quan bằng Tiếng Việt có dấu đầy đủ và gợi ý hành động
+        Process operator query and coordinate handoff if needed:
+        1. Intent Classification
+        2. Real-time telemetry, Sentinel, and Incident Memory KB lookup
+        3. Delegation (Handoff) to Deep Quant Investigator if micro-diagnostic needed
+        4. Return clean, structured English Markdown response with recommended actions
         """
         q = query.lower().strip()
         t0 = time.time()
@@ -59,7 +59,7 @@ class SecOpsCopilotAgent:
         reply = ""
 
         # 1. INTENT: Deep Anomaly Diagnosis / TOCTOU Investigation (Triggers Handoff)
-        if any(k in q for k in ["chẩn đoán", "chan doan", "điều tra", "dieu tra", "investigate", "rca", "gốc rễ", "goc re", "toctou", "race condition", "xung đột", "xung dot", "dirty read"]):
+        if any(k in q for k in ["chẩn đoán", "chan doan", "điều tra", "dieu tra", "investigate", "investigation", "rca", "gốc rễ", "goc re", "toctou", "race condition", "xung đột", "xung dot", "dirty read", "diagnose", "diagnosis", "root cause", "exploit"]):
             handoff_invoked = True
             inv_report = await global_quant_investigator.diagnose_anomaly(target_endpoint="/api/v1/voucher/claim")
             investigator_data = inv_report
@@ -67,23 +67,23 @@ class SecOpsCopilotAgent:
             qm = inv_report.get("quantitative_metrics", {})
 
             reply = (
-                f"**Kết quả Điều tra Chuyên sâu từ Deep Quant Investigator (Sandbox Python):**\n\n"
-                f"- **Mục tiêu phân tích**: `{inv_report.get('target_endpoint')}`\n"
-                f"- **Phân loại lỗ hổng**: `{inv_report.get('threat_type')}`\n"
-                f"- **Cửa sổ lỗ hổng vi mô (Vulnerability Gap)**: **{rca.get('vulnerability_gap_ms', 1.45):.2f}ms** (Nhỏ nhất: **{rca.get('min_observed_gap_ms', 0.42):.2f}ms**)\n"
-                f"- **Xác suất Dirty Read**: **{rca.get('dirty_read_probability', 0.933)*100:.1f}%** ({qm.get('dirty_read_count', 14)}/{qm.get('total_analyzed', 15)} yêu cầu trong đợt burst vượt qua kiểm tra số dư)\n"
-                f"- **Thiệt hại dòng tiền ước tính**: **${rca.get('capital_loss_usd', 7500.0):,.2f}** mỗi đợt tấn công\n\n"
-                f"> **Kết luận Nguyên nhân Gốc rễ (RCA):** {rca.get('rca_summary')}\n\n"
-                f"**Giải pháp phòng thủ đã xác minh:** {rca.get('remediation_patch')}"
+                f"**Deep Investigation Results from Deep Quant Investigator (Sandbox Python):**\n\n"
+                f"- **Target Endpoint**: `{inv_report.get('target_endpoint')}`\n"
+                f"- **Threat Classification**: `{inv_report.get('threat_type')}`\n"
+                f"- **Micro Vulnerability Gap**: **{rca.get('vulnerability_gap_ms', 1.45):.2f}ms** (Minimum observed: **{rca.get('min_observed_gap_ms', 0.42):.2f}ms**)\n"
+                f"- **Dirty Read Probability**: **{rca.get('dirty_read_probability', 0.933)*100:.1f}%** ({qm.get('dirty_read_count', 14)}/{qm.get('total_analyzed', 15)} burst requests bypassed balance check)\n"
+                f"- **Estimated Capital Exposure**: **${rca.get('capital_loss_usd', 7500.0):,.2f}** per burst exploit\n\n"
+                f"> **Root Cause Analysis (RCA) Verdict:** {rca.get('rca_summary')}\n\n"
+                f"**Verified Defense Patch:** {rca.get('remediation_patch')}"
             )
             suggested_actions = [
-                {"label": "Lập phiếu Work Order khắc phục", "action": "open_work_order"},
-                {"label": "Chuyển Blue Team Aegis vá lỗi", "action": "trigger_blue_patch"},
-                {"label": "Xem mã Python đã thực thi", "action": "view_investigator_code"}
+                {"label": "Generate Remediation Work Order", "action": "open_work_order"},
+                {"label": "Handoff to Aegis Blue Team", "action": "trigger_blue_patch"},
+                {"label": "View Executed Sandbox Python Code", "action": "view_investigator_code"}
             ]
 
         # 2. INTENT: Sentinel Status & System Health
-        elif any(k in q for k in ["tấn công", "tan cong", "sentinel", "trạng thái", "trang thai", "sức khỏe", "suc khoe", "health", "drift", "bình thường", "binh thuong"]):
+        elif any(k in q for k in ["tấn công", "tan cong", "sentinel", "trạng thái", "trang thai", "sức khỏe", "suc khoe", "health", "drift", "bình thường", "binh thuong", "attack", "status", "normal", "under attack", "posture"]):
             sent_status = global_fintech_sentinel.get_status().get("current_state", {})
             verdict = sent_status.get("verdict", "NORMAL")
             tps = sent_status.get("tps", 10.0)
@@ -91,89 +91,89 @@ class SecOpsCopilotAgent:
             derivative = sent_status.get("velocity_derivative", 0.0)
             reason = sent_status.get("reason", "")
 
-            # Translate reason to proper Vietnamese if in English
-            reason_vn = reason
+            # Context evaluation
+            reason_en = reason
             if "nominal" in reason.lower():
-                reason_vn = "Hệ thống đang vận hành trong giới hạn an toàn danh định, không phát hiện xung đột vi mô hay dấu hiệu tấn công bất thường."
+                reason_en = "System operating within nominal safety thresholds; no micro-concurrency collisions or anomalous exploit patterns detected."
             elif "surge" in reason.lower() and "flash sale" in reason.lower():
-                reason_vn = "Lưu lượng giao dịch tăng vọt nhưng Bộ lọc Ngữ cảnh xác nhận đang trong khung giờ Flash Sale hợp lệ với người dùng phân tán và IP dân cư sạch. Sentinel đứng yên (Stand-Down) để tránh chặn nhầm khách hàng."
+                reason_en = "Transaction traffic surging, but Contextual Filter confirms active authorized Flash Sale with dispersed residential IPs. Sentinel standing down to prevent false positive customer blocks."
             elif "concurrency clustering" in reason.lower() or "exploit" in reason.lower():
-                reason_vn = "Phát hiện cụm giao dịch xung đột dưới mili-giây (sub-millisecond clustering). Nguy cơ cao xảy ra tấn công đua lệnh TOCTOU hoặc Sybil bot. Khuyến nghị ủy quyền cho Deep Investigator xử lý khẩn cấp."
+                reason_en = "Sub-millisecond concurrency collision cluster detected. High probability of active TOCTOU race exploit or Sybil bot attack. Recommending autonomous handoff to Deep Investigator."
 
             reply = (
-                f"**Báo cáo Giám sát Thời gian thực từ FinTech Sentinel:**\n\n"
-                f"- **Phán quyết Sentinel hiện tại**: **{sent_status.get('verdict_badge', verdict)}**\n"
-                f"- **Tốc độ giao dịch thời gian thực**: **{tps} tx/s** (Đạo hàm vận tốc: `{derivative:+.2f} tx/s^2`)\n"
-                f"- **Dự báo đuôi tín hiệu (t+30s)**: **{fc30} tx/s**\n"
-                f"- **Độ đa dạng người dùng (Entropy)**: **{sent_status.get('user_entropy', 0.95)*100:.1f}%**\n"
-                f"- **Tỷ lệ Proxy Datacenter**: **{sent_status.get('proxy_ratio', 0.02)*100:.1f}%**\n"
-                f"- **Xung đột sub-50ms**: **{sent_status.get('concurrency_clusters', 0)} va chạm**\n\n"
-                f"> **Đánh giá ngữ cảnh:** {reason_vn}"
+                f"**Real-Time Monitoring Report from FinTech Sentinel:**\n\n"
+                f"- **Current Sentinel Verdict**: **{sent_status.get('verdict_badge', verdict)}**\n"
+                f"- **Real-Time Throughput**: **{tps} tx/s** (Velocity Derivative: `{derivative:+.2f} tx/s^2`)\n"
+                f"- **Tail Forecast (t+30s)**: **{fc30} tx/s**\n"
+                f"- **User Diversity Entropy**: **{sent_status.get('user_entropy', 0.95)*100:.1f}%**\n"
+                f"- **Datacenter Proxy Ratio**: **{sent_status.get('proxy_ratio', 0.02)*100:.1f}%**\n"
+                f"- **Sub-50ms Concurrency Collisions**: **{sent_status.get('concurrency_clusters', 0)} collisions**\n\n"
+                f"> **Contextual Evaluation:** {reason_en}"
             )
             suggested_actions = [
-                {"label": "Kiểm tra chu kỳ Flash Sale", "action": "view_policies"},
-                {"label": "Chạy chẩn đoán sâu với Investigator", "action": "run_investigator"},
-                {"label": "Mở bảng giám sát Sentinel", "action": "open_sentinel_modal"}
+                {"label": "Inspect Flash Sale Policies", "action": "view_policies"},
+                {"label": "Run Deep Diagnostic with Investigator", "action": "run_investigator"},
+                {"label": "Open Sentinel Monitor", "action": "open_sentinel_modal"}
             ]
 
         # 3. INTENT: Incident Memory & Past Failures
-        elif any(k in q for k in ["sự cố", "su co", "quá khứ", "qua khu", "lịch sử", "lich su", "incident", "memory", "kb", "cve"]):
+        elif any(k in q for k in ["sự cố", "su co", "quá khứ", "qua khu", "lịch sử", "lich su", "incident", "memory", "kb", "cve", "history", "past"]):
             incidents = get_incident_memory(limit=5)
             inc_lines = []
             for inc in incidents:
                 inc_lines.append(
-                    f"- **{inc.get('incident_id')}** [{inc.get('threat_type')}] — Thiệt hại: **${inc.get('financial_loss', 0):,.2f}** | Trạng thái: `{inc.get('status')}`\n"
+                    f"- **{inc.get('incident_id')}** [{inc.get('threat_type')}] — Capital Exposure: **${inc.get('financial_loss', 0):,.2f}** | Status: `{inc.get('status')}`\n"
                     f"  *RCA*: {inc.get('rca_summary')[:100]}...\n"
-                    f"  *Bản vá*: `{inc.get('remediation_patch')[:80]}...`"
+                    f"  *Patch*: `{inc.get('remediation_patch')[:80]}...`"
                 )
 
             reply = (
-                f"**Lịch sử Sự cố và Bản vá trong Incident Memory KB ({len(incidents)} bản ghi):**\n\n"
+                f"**Incident History & Past Remediation in Incident Memory KB ({len(incidents)} records):**\n\n"
                 + "\n\n".join(inc_lines) + "\n\n"
-                f"Hệ thống tự động đối chiếu các sự cố này khi Sentinel phát hiện bất thường để tái sử dụng giải pháp phòng ngự đã được chứng minh."
+                f"The system automatically correlates these historical incidents whenever Sentinel detects telemetry drift to reuse proven defense patches."
             )
             suggested_actions = [
-                {"label": "Kiểm tra chi tiết Incident Memory", "action": "open_memory_tab"},
-                {"label": "Chẩn đoán lỗ hổng hiện tại", "action": "run_investigator"}
+                {"label": "View Incident Memory Details", "action": "open_memory_tab"},
+                {"label": "Diagnose Current Vulnerability", "action": "run_investigator"}
             ]
 
         # 4. INTENT: Policy Rules / Flash Sale
-        elif any(k in q for k in ["chính sách", "chinh sach", "quy tắc", "quy tac", "flash sale", "khuyến mãi", "khuyen mai", "policy", "stand-down"]):
+        elif any(k in q for k in ["chính sách", "chinh sach", "quy tắc", "quy tac", "flash sale", "khuyến mãi", "khuyen mai", "policy", "policies", "rule", "rules", "stand-down"]):
             policies = get_policy_rules()
             pol_lines = []
             for p in policies:
                 pol_lines.append(
-                    f"- **{p.get('rule_id')}** ({p.get('name')}): `{p.get('rule_type')}` trên `{p.get('endpoint')}`\n"
-                    f"  Ngưỡng cho phép: **{p.get('threshold_value')}** | Trạng thái: **{'ACTIVE (ĐANG BẬT)' if p.get('is_active') == 1 else 'DISABLED (TẮT)'}**\n"
-                    f"  *Mô tả*: {p.get('description')}"
+                    f"- **{p.get('rule_id')}** ({p.get('name')}): `{p.get('rule_type')}` on `{p.get('endpoint')}`\n"
+                    f"  Threshold: **{p.get('threshold_value')}** | Status: **{'ACTIVE' if p.get('is_active') == 1 else 'DISABLED'}**\n"
+                    f"  *Description*: {p.get('description')}"
                 )
 
             reply = (
-                f"**Danh mục Quy tắc Kiểm soát Ngữ cảnh & Cửa sổ Flash Sale ({len(policies)} quy tắc):**\n\n"
+                f"**Contextual Control Rules & Flash Sale Windows ({len(policies)} rules):**\n\n"
                 + "\n\n".join(pol_lines) + "\n\n"
-                f"Sentinel sử dụng các quy tắc này để thực hiện Contextual Stand-Down, không phát báo động giả trong khung giờ Flash Sale hợp lệ."
+                f"Sentinel utilizes these rules to execute Contextual Stand-Down, preventing false alarms during legitimate promotional flash sale windows."
             )
             suggested_actions = [
-                {"label": "Bật/Tắt quy tắc Sentinel", "action": "open_policies_tab"},
-                {"label": "Giả lập đợt Flash Sale", "action": "simulate_flash_sale"}
+                {"label": "Toggle Sentinel Policies", "action": "open_policies_tab"},
+                {"label": "Simulate Flash Sale Event", "action": "simulate_flash_sale"}
             ]
 
         # 5. INTENT: Work Order Generation
-        elif any(k in q for k in ["work order", "phiếu", "phieu", "khắc phục", "khac phuc", "canary", "rollout", "lệnh sửa", "lenh sua"]):
+        elif any(k in q for k in ["work order", "phiếu", "phieu", "khắc phục", "khac phuc", "canary", "rollout", "lệnh sửa", "lenh sua", "remediation", "patch"]):
             reply = (
-                f"**Phiếu Điều phối Can thiệp Kỹ thuật (SecOps Work Order):**\n\n"
-                f"- **Mã phiếu**: `WO-2026-0814` (Mức độ ưu tiên: `P0_CRITICAL`)\n"
-                f"- **Thành phần ảnh hưởng**: `/api/v1/voucher/claim` (Loyalty & Checkout Microservice)\n"
-                f"- **Bản vá đề xuất**: Redis Distributed Mutex (`lock_ttl = 3.0s`) trên key `lock:voucher:{{user_id}}`\n"
-                f"- **Quy trình Canary Rollout**:\n"
-                f"  1. Giai đoạn 1: 5% lưu lượng canary trong 15 phút (Độ trễ tăng thêm <= 2ms, 0 False Positives)\n"
-                f"  2. Giai đoạn 2: 25% lưu lượng nếu tỷ lệ lỗi HTTP 500 = 0.00%\n"
-                f"  3. Giai đoạn 3: 100% toàn bộ cụm máy chủ production\n"
-                f"- **Tiêu chí Rollback tự động**: Độ trễ P99 vượt quá 45ms hoặc tỷ lệ lỗi HTTP 500 > 0.05%."
+                f"**SecOps Technical Intervention Work Order:**\n\n"
+                f"- **Work Order ID**: `WO-2026-0814` (Priority: `P0_CRITICAL`)\n"
+                f"- **Affected Component**: `/api/v1/voucher/claim` (Loyalty & Checkout Microservice)\n"
+                f"- **Proposed Patch**: Redis Distributed Mutex (`lock_ttl = 3.0s`) on key `lock:voucher:{{user_id}}`\n"
+                f"- **Canary Rollout Specification**:\n"
+                f"  1. Stage 1: 5% canary traffic for 15 minutes (Latency delta <= 2ms, 0 False Positives)\n"
+                f"  2. Stage 2: 25% traffic allocation if HTTP 500 error rate = 0.00%\n"
+                f"  3. Stage 3: 100% full production cluster deployment\n"
+                f"- **Automated Rollback Criteria**: P99 latency exceeds 45ms or HTTP 500 error rate > 0.05%."
             )
             suggested_actions = [
-                {"label": "Mở giao diện Work Order", "action": "open_work_order"},
-                {"label": "Chạy kiểm thử Zero-Regression", "action": "trigger_regression_test"}
+                {"label": "Open Work Order View", "action": "open_work_order"},
+                {"label": "Run Zero-Regression Test", "action": "trigger_regression_test"}
             ]
 
         # 6. Default / Fallback Response
@@ -184,7 +184,7 @@ class SecOpsCopilotAgent:
                     sent_status = global_fintech_sentinel.get_status().get("current_state", {})
                     context = (
                         f"Current Sentinel verdict: {sent_status.get('verdict')}, TPS: {sent_status.get('tps')}. "
-                        "You are AIGIS SecOps Copilot. Answer concisely in Vietnamese with full accents."
+                        "You are AIGIS AI Assistant. Answer concisely in professional English with Markdown formatting."
                     )
                     reply = await global_llm_engine.call_llm(self.system_prompt, f"Context: {context}\n\nUser Question: {query}")
                 except Exception:
@@ -192,17 +192,17 @@ class SecOpsCopilotAgent:
 
             if not reply:
                 reply = (
-                    f"Tôi là **SecOps Copilot** của nền tảng AIGIS. Tôi có thể hỗ trợ bạn:\n\n"
-                    f"1. **Kiểm tra sức khỏe hệ thống**: Hỏi *'Hệ thống có đang bị tấn công không?'* để xem phán quyết Sentinel.\n"
-                    f"2. **Chẩn đoán gốc rễ (RCA)**: Hỏi *'Chẩn đoán lỗ hổng TOCTOU'* để tôi ủy quyền cho Deep Quant Investigator lập trình Python tính toán vi mô trong sandbox.\n"
-                    f"3. **Lịch sử sự cố**: Hỏi *'Xem lịch sử sự cố trong Incident Memory'* để tra cứu các lỗ hổng và bản vá đã lưu.\n"
-                    f"4. **Chính sách Flash Sale**: Hỏi *'Xem quy tắc khuyến mãi'* để kiểm tra bộ lọc Contextual Stand-Down.\n"
-                    f"5. **Xuất Work Order**: Hỏi *'Tạo phiếu Work Order khắc phục'* để xem quy trình canary rollout 3 giai đoạn."
+                    f"I am the **AI Assistant** for the AIGIS FinTech platform. I can assist you with:\n\n"
+                    f"1. **System Health & Anomaly Check**: Ask *'Is the system under attack?'* to inspect Sentinel's verdict.\n"
+                    f"2. **Root Cause Analysis (RCA)**: Ask *'Diagnose TOCTOU vulnerability'* to trigger autonomous Python sandbox computation.\n"
+                    f"3. **Incident Memory KB**: Ask *'Show incident history'* to retrieve past exploit signatures and verified patches.\n"
+                    f"4. **Flash Sale Policies**: Ask *'View policy rules'* to review Contextual Stand-Down filters.\n"
+                    f"5. **SecOps Work Order**: Ask *'Generate Work Order'* to review the 3-stage canary rollout plan."
                 )
             suggested_actions = [
-                {"label": "Hệ thống có bị tấn công không?", "action": "ask_system_health"},
-                {"label": "Chẩn đoán chuyên sâu lỗ hổng TOCTOU", "action": "ask_investigate_toctou"},
-                {"label": "Xem lịch sử Incident Memory", "action": "ask_view_history"}
+                {"label": "Is the system under attack?", "action": "ask_system_health"},
+                {"label": "Diagnose TOCTOU vulnerability", "action": "ask_investigate_toctou"},
+                {"label": "View Incident Memory history", "action": "ask_view_history"}
             ]
 
         elapsed_ms = round((time.time() - t0) * 1000.0, 1)
