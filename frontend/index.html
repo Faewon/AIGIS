@@ -1167,21 +1167,59 @@ pre.bg-gray-950 code {
     <!-- ========================================================================= -->
     <!-- 2. POWER BI FLUENT RIBBON BAR (LIGHT GRAY #f3f2f1)                        -->
     <!-- ========================================================================= -->
+        <!-- ========================================================================= -->
+    <!-- 2. POWER BI FLUENT RIBBON BAR (LIGHT GRAY #f3f2f1)                        -->
+    <!-- ========================================================================= -->
     <header class="pbi-ribbon select-none sticky top-9 z-40 text-xs font-mono" style="background-color: #f3f2f1 !important; border-bottom: 1px solid #e1dfdd !important;">
-        <!-- Ribbon Menu Tabs Row -->
-        <div class="flex items-center justify-between px-3 pt-1 border-b border-[#e1dfdd] bg-[#fdfdfd]">
-            <div class="flex items-center space-x-1">
-                <span class="px-3 py-1 font-semibold text-slate-500 rounded-t cursor-pointer hover:bg-slate-200/50">File</span>
-                <button onclick="switchPowerBiView('data')" id="header-tab-data" class="px-3 py-1 font-bold text-[#107c41] border-b-2 border-[#107c41] bg-white rounded-t shadow-2xs cursor-pointer">Home / Data</button>
-                <button onclick="switchPowerBiView('model')" id="header-tab-model" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">Modeling</button>
-                <button onclick="switchPowerBiView('wargame')" id="header-tab-table" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">Wargame Arena</button>
-                <button onclick="switchPowerBiView('sql')" id="header-tab-sql" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">SQL Console</button>
-                <button onclick="switchPowerBiView('fyi')" id="header-tab-fyi" class="px-3 py-1 font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-t cursor-pointer">FYI Guide</button>
+        <!-- Ribbon Action Toolbar (Integrated with Data Ops, No Duplicate Page Tabs) -->
+        <div class="px-4 py-1.5 flex items-center justify-between overflow-x-auto text-xs">
+            <!-- Left Action Groups: Analysis & Security -->
+            <div class="flex items-center space-x-4">
+                <!-- Group 1: Data Queries & Intelligence -->
+                <div class="flex items-center space-x-2 pr-4 border-r border-[#d2d0ce]">
+                    <button onclick="filterDatabaseRows('all')" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Refresh dataset and clear filters">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        <span>Refresh</span>
+                    </button>
+                    <button onclick="runAiTrafficClassification()" id="btn-ai-classify" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Run fast AI classification on HTTP traffic">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        <span>Fast Classify</span>
+                    </button>
+                    <button onclick="runDeepDiveForensics()" id="btn-deep-dive" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Deep forensic analysis of exploit packets">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <span>Forensics</span>
+                    </button>
+                    <span class="text-[9px] text-slate-400 uppercase font-bold self-end tracking-wider">Analysis</span>
+                </div>
+
+                <!-- Group 2: Security & Schema Compliance -->
+                <div class="flex items-center space-x-2">
+                    <button onclick="openPiiScannerModal()" id="btn-pii-scanner" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Scan dataset for unmasked credit cards & PII">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        <span>PII Scanner</span>
+                    </button>
+                    <button onclick="openFintechRiskModal()" id="btn-fintech-risk" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Sardine/Feedzai inspired risk scoring engine">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        <span>Risk Engine</span>
+                    </button>
+                    <button onclick="openOpenApiModal()" id="btn-openapi-ingest" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Import OpenAPI / Swagger specification">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        <span>Import API</span>
+                    </button>
+                    <button onclick="openQuantInvestigatorModal()" id="btn-quant-investigator" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-rose-700 font-bold cursor-pointer" title="ARIA-inspired Deep Quant Investigator: Autonomous Python Sandbox RCA">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                        <span>Investigator (RCA)</span>
+                    </button>
+                    <button onclick="openSecOpsWorkOrderModal()" id="btn-secops-workorder" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-amber-700 font-bold cursor-pointer" title="ARIA-inspired SecOps Work Order: Canary Rollout & Redis Mutex Spec">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                        <span>Work Order</span>
+                    </button>
+                    <span class="text-[9px] text-slate-400 uppercase font-bold self-end tracking-wider">Security</span>
+                </div>
             </div>
 
-            <!-- Right Options in Ribbon -->
-            <div class="flex items-center space-x-1.5 pb-1">
-                <!-- Database Options Dropdown Trigger -->
+            <!-- Right Group: Data Ingestion & Export Operations -->
+            <div class="flex items-center space-x-2 pl-4 border-l border-[#d2d0ce]">
                 <div class="relative inline-block text-left">
                     <button onclick="toggleDbDropdown(event)" id="btn-db-dropdown" class="px-2.5 py-0.5 bg-white hover:bg-slate-100 text-slate-800 font-bold border border-[#d2d0ce] rounded text-[11px] shadow-2xs flex items-center space-x-1 cursor-pointer">
                         <span>[DATABASE OPTIONS v]</span>
@@ -1235,53 +1273,7 @@ pre.bg-gray-950 code {
                     <span>Export CSV</span>
                 </a>
             </div>
-        </div>
-
-        <!-- Ribbon Action Icons Strip (Microsoft Fluent Grouped Ribbon - Cleaned of Duplicate Views) -->
-        <div class="px-4 py-1.5 flex items-center space-x-4 overflow-x-auto text-xs">
-            <!-- Group 1: Data Queries & Intelligence -->
-            <div class="flex items-center space-x-2 pr-4 border-r border-[#d2d0ce]">
-                <button onclick="filterDatabaseRows('all')" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Refresh dataset and clear filters">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                    <span>Refresh</span>
-                </button>
-                <button onclick="runAiTrafficClassification()" id="btn-ai-classify" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Run fast AI classification on HTTP traffic">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                    <span>Fast Classify</span>
-                </button>
-                <button onclick="runDeepDiveForensics()" id="btn-deep-dive" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Deep forensic analysis of exploit packets">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <span>Forensics</span>
-                </button>
-                <span class="text-[9px] text-slate-400 uppercase font-bold self-end tracking-wider">Analysis</span>
             </div>
-
-            <!-- Group 2: Security & Schema Compliance -->
-            <div class="flex items-center space-x-2">
-                <button onclick="openPiiScannerModal()" id="btn-pii-scanner" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Scan dataset for unmasked credit cards & PII">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                    <span>PII Scanner</span>
-                </button>
-                <button onclick="openFintechRiskModal()" id="btn-fintech-risk" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Sardine/Feedzai inspired risk scoring engine">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                    <span>Risk Engine</span>
-                </button>
-                <button onclick="openOpenApiModal()" id="btn-openapi-ingest" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-slate-700 cursor-pointer" title="Import OpenAPI / Swagger specification">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-                    <span>Import API</span>
-                </button>
-                <button onclick="openQuantInvestigatorModal()" id="btn-quant-investigator" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-rose-700 font-bold cursor-pointer" title="ARIA-inspired Deep Quant Investigator: Autonomous Python Sandbox RCA">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                    <span>Investigator (RCA)</span>
-                </button>
-                <button onclick="openSecOpsWorkOrderModal()" id="btn-secops-workorder" class="px-2 py-1 flex flex-col items-center hover:bg-white rounded transition text-[11px] text-amber-700 font-bold cursor-pointer" title="ARIA-inspired SecOps Work Order: Canary Rollout & Redis Mutex Spec">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    <span>Work Order</span>
-                </button>
-                <span class="text-[9px] text-slate-400 uppercase font-bold self-end tracking-wider">Security</span>
-            </div>
-
-
         </div>
     </header>
 
@@ -2228,44 +2220,10 @@ Chào bạn, tôi là <strong>SecOps Copilot</strong> của hệ thống AIGIS (
             <!-- 4. POWER BI VIEW: WARGAME ARENA (AUTONOMOUS DEFENSE & SELF-HEALING ENGINE)-->
             <!-- (Dedicated separate page containing KPIs, ReAct Track & Cells 0 - 6)      -->
             <!-- ========================================================================= -->
-            <div id="pbi-page-wargame" class="hidden flex flex-row gap-6 items-start">
-                <!-- Wargame Sidebar: Pure Text Navigation & Telemetry Stream -->
-                <aside class="pbi-left-rail select-none z-20 shrink-0" style="width: 50px !important; background-color: #f3f2f1 !important; border-right: 1px solid #e1dfdd !important; display: flex !important; flex-direction: column !important; align-items: center !important; padding-top: 14px !important; padding-bottom: 14px !important; gap: 14px !important;">
-            <!-- 1. Report View / Wargame Arena -->
-            <button onclick="switchPowerBiView('wargame')" id="rail-btn-report" class="pbi-rail-btn pbi-rail-btn-inactive" style="width: 38px !important; height: 38px !important; display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 4px !important; cursor: pointer !important; background-color: transparent !important; color: #605e5c !important; border-left: 3px solid transparent !important;" title="Wargame Arena (Self-Healing Engine)">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-            </button>
+            <div id="pbi-page-wargame" class="hidden min-w-0">
+                <!-- Wargame Sidebar: Pu
 
-            <!-- 2. Table / Data View -->
-            <button onclick="switchPowerBiView('data')" id="rail-btn-data" class="pbi-rail-btn pbi-rail-btn-active" style="width: 38px !important; height: 38px !important; display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 4px !important; cursor: pointer !important; background-color: #ffffff !important; color: #107c41 !important; border-left: 3px solid #107c41 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;" title="Table / Data View (20 Pages)">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-            </button>
-
-            <!-- 3. Model View -->
-            <button onclick="switchPowerBiView('model')" id="rail-btn-model" class="pbi-rail-btn pbi-rail-btn-inactive" style="width: 38px !important; height: 38px !important; display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 4px !important; cursor: pointer !important; background-color: transparent !important; color: #605e5c !important; border-left: 3px solid transparent !important;" title="Model View (Schema Relationships)">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="6"></rect><rect x="15" y="3" width="6" height="6"></rect><rect x="9" y="15" width="6" height="6"></rect><path d="M6 9v3h6v3m3-6v-3"></path></svg>
-            </button>
-
-            <!-- Separator -->
-            <div style="width: 24px !important; height: 1px !important; background-color: #d2d0ce !important; margin: 2px 0 !important;"></div>
-
-            <!-- 4. SQL Query -->
-            <button onclick="switchPowerBiView('sql')" id="rail-btn-sql" class="pbi-rail-btn pbi-rail-btn-inactive" style="width: 38px !important; height: 38px !important; display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 4px !important; cursor: pointer !important; background-color: transparent !important; color: #605e5c !important; border-left: 3px solid transparent !important;" title="SQL Query Console">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-            </button>
-
-            <!-- 5. AI Copilot -->
-            <button onclick="switchPowerBiView('text2sql')" id="rail-btn-text2sql" class="pbi-rail-btn pbi-rail-btn-inactive" style="width: 38px !important; height: 38px !important; display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 4px !important; cursor: pointer !important; background-color: transparent !important; color: #605e5c !important; border-left: 3px solid transparent !important;" title="AI Text-to-SQL Assistant">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"></path></svg>
-            </button>
-
-            <!-- 6. FYI Knowledge & Architecture Guide -->
-            <button onclick="switchPowerBiView('fyi')" id="rail-btn-fyi" class="pbi-rail-btn pbi-rail-btn-inactive" style="width: 38px !important; height: 38px !important; display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 4px !important; cursor: pointer !important; background-color: transparent !important; color: #605e5c !important; border-left: 3px solid transparent !important;" title="FYI Knowledge Base & Comprehensive System Guide">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            </button>
-        </aside>
-
-        <!-- CENTER CANVAS WORKSPACE -->
+        NVAS WORKSPACE -->
         <div class="flex-1 min-w-0 overflow-y-auto px-6 py-4 flex gap-6">
 
         <!-- ===================================================================== -->
@@ -6153,28 +6111,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 }
             });
 
-            // 2. Sync Ribbon Tabs
-            const headerTabs = {
-                'data': 'header-tab-data',
-                'model': 'header-tab-model',
-                'wargame': 'header-tab-table',
-                'sql': 'header-tab-sql',
-                'fyi': 'header-tab-fyi'
-            };
-
-            const activeHeaderKey = (mode === 'text2sql') ? 'data' : mode;
-            Object.entries(headerTabs).forEach(([key, tabId]) => {
-                const tab = document.getElementById(tabId);
-                if (tab) {
-                    if (key === activeHeaderKey) {
-                        tab.className = "px-3 py-1 font-bold pbi-ribbon-tab-active bg-white rounded-t shadow-2xs cursor-pointer";
-                        tab.style.cssText = "color: #107c41 !important; border-bottom: 2px solid #107c41 !important; background-color: #ffffff !important; font-weight: bold !important;";
-                    } else {
-                        tab.className = "px-3 py-1 font-semibold pbi-ribbon-tab-inactive rounded-t cursor-pointer";
-                        tab.style.cssText = "color: #605e5c !important; border-bottom: 2px solid transparent !important; background-color: transparent !important;";
-                    }
-                }
-            });
+            // Top redundant navigation tabs were eliminated in favor of Left Navigation Rail
 
             // 3. Sync Cell 0 internal buttons if present
             const cell0Tabs = {
