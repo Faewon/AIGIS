@@ -27,6 +27,9 @@ backend/datasets/*.csv
 scratch/*
 !scratch/check_project.py
 !scratch/check_browser.py
+!scratch/check_docs.py
+!scratch/check_model_layout.cjs
+!scratch/benchmark_telemetry.py
 *.bak
 scratch_classes.txt
 apply_sidebar_update.py
