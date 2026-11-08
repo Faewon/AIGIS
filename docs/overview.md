@@ -1,8 +1,12 @@
 # AIGIS — Bản Tóm Tắt Dự Án (One-Pager)
+> Status: Current · Updated: 2026-11-08 · Scope: Local simulation
+>
+> [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Demo](demo.md)
+
 **AIGIS: Adversarial Intelligence for Generative Immunity & Security**
 
 > [!IMPORTANT]
-> **Phạm vi:** AIGIS là **proof-of-concept (bản mô phỏng)**. Mọi đòn tấn công, bản vá và kiểm thử lại đều chạy trên một **mock target trong cùng tiến trình** (`backend/mock_target/store.py`) với dữ liệu giả lập. Hiện chưa thể trỏ AIGIS vào một hệ thống thật. Chi tiết giới hạn xem `README.md` mục *Scope & limitations*.
+> **Phạm vi:** AIGIS là **proof-of-concept (bản mô phỏng)**. Mọi đòn tấn công, bản vá và kiểm thử lại đều chạy trên một **mock target trong cùng tiến trình** (`backend/mock_target/store.py`) với dữ liệu giả lập. Hiện chưa thể trỏ AIGIS vào một hệ thống thật. Chi tiết giới hạn xem [README](../README.md) mục *Scope & limitations*.
 
 > **Tên gọi:**
 > * **A** — **A**dversarial *(Tác chiến đối kháng / Red Teaming)*
@@ -27,7 +31,7 @@ flowchart LR
 
 1. **Dò Shadow API:** Quét file `checkout_bundle.js` bằng regex để tìm endpoint không có trong tài liệu API.
 2. **Red Team burst:** Agent *Cerebrus* chạy N lời gọi đồng thời (`asyncio.gather`) vào mock store để tái hiện race condition. Không gửi HTTP thật.
-3. **Sandbox & đo thất thoát:** Đếm số lần nhận voucher trùng và quy ra số tiền bị chiếm (ví dụ: *15 voucher × $500 = $7,500* trên mock target).
+3. **Sandbox & đo thất thoát:** Đếm số lần nhận voucher trùng và quy ra số tiền bị chiếm. Ví dụ nếu 15 lượt cùng thành công, mỗi voucher $500 và 1 lượt là hợp lệ: tổng tiền được duyệt là $7,500, nhưng **thất thoát do nhận trùng là 14 × $500 = $7,000** trên mock target.
 4. **Blue Team vá & kiểm thử lại:** Agent *Aegis* sinh **mã vá mẫu** (SQL atomic claim, FastAPI, Spring, Gin, WAF). Trên mock target, "áp bản vá" là bật cờ khóa; bài retest chỉ đạt khi **đúng 1** lần nhận thành công. Bài kiểm tra regression đo tỷ lệ chặn nhầm và độ trễ tăng thêm trên chính mock target.
 
 ---
@@ -63,6 +67,7 @@ Ngoài ra: **FinTech Sentinel** (theo dõi TPS, lọc flash sale hợp lệ), **
 - [x] Mã vá mẫu đa nền tảng (SQL, FastAPI, Spring, Gin, Cloudflare, NGINX, AWS WAF) — không thực thi.
 - [x] Dashboard một trang (`frontend/index.html`), Copilot hỏi đáp, NL-to-SQL, bộ phân loại traffic.
 - [x] API có token, chỉ bind `127.0.0.1`, có bộ test hồi quy bảo mật.
+- [x] Evidence gắn với dataset/run; full workflow có mock store riêng, seed, lưu kết quả và replay. Xem [kiến trúc](architecture.md#6-evidence-isolation-và-replay).
 - [ ] Gửi HTTP đồng thời thật vào một service mục tiêu riêng.
 - [ ] Tạo PR thật qua GitHub API.
 - [ ] Dữ liệu và tỷ lệ gian lận sát thực tế ngân hàng.

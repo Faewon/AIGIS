@@ -1,4 +1,8 @@
 # AIGIS — Kịch Bản Demo 3 Phút
+> Status: Current · Updated: 2026-11-08 · Scope: Local simulation
+>
+> [Mục lục](README.md) · [Kiến trúc](architecture.md)
+
 **AIGIS: Adversarial Intelligence for Generative Immunity & Security**
 
 > [!IMPORTANT]
@@ -11,6 +15,15 @@
 > 4. **Lượng hóa:** báo cáo thất thoát trước/sau vá và nội dung PR (mô phỏng).
 
 ---
+
+## Chuẩn bị trước demo
+
+1. Từ thư mục gốc, cài dependencies theo [Quick Start](../README.md#quick-start-guide), chạy `python run_server.py` và mở `http://127.0.0.1:8000`.
+2. Dùng offline heuristic provider nếu không cần trình diễn LLM; xác nhận cấu hình agent trước khi bấm chạy. Dashboard tự gửi API token, không yêu cầu đăng nhập.
+3. Nếu trình diễn Data/Sentinel/Investigator, chuẩn bị telemetry bằng UI: generate dataset rồi sync database. Wargame trên mock store không đòi hỏi dataset một triệu dòng.
+4. Chọn cùng cấu hình cho các lần tập: ví dụ 1 round, 15 burst streams. Khi chạy qua API, có thể gửi `seed: 42` vào `/api/v1/wargame/run_full`; không giả định UI có ô seed. Seed không cố định latency hoặc ID.
+5. Về màn hình Wargame, kiểm tra target đã reset và không có phiên stage-by-stage khác đang dùng chung trạng thái. Tập một lượt để xác nhận nhãn nút và kết quả trên phiên bản UI đang dùng.
+6. Khi trình bày, đọc số liệu của lần chạy thực tế. Nếu lỗi hoặc thiếu dữ liệu, hiển thị trạng thái đó và chạy lại sau khi kiểm tra cấu hình.
 
 ## Timeline
 
@@ -68,7 +81,7 @@ timeline
   3. Bật bản vá trên mock target và bấm **Re-test**: chỉ **1** request được duyệt, các request trùng bị chặn (`429`).
   4. Regression check: chạy cùng một nhóm người dùng hợp lệ khi tắt/bật bản vá, hiển thị **tỷ lệ chặn nhầm** và **độ trễ tăng thêm** đo được.
 * **Lời thoại:**
-  > *"Blue Team đề xuất cách sửa gốc bằng ràng buộc duy nhất ở cơ sở dữ liệu, kèm mẫu cho các nền tảng phổ biến. Khi bật bản vá trên hệ thống mẫu, chạy lại đúng đợt tấn công cũ: chỉ một yêu cầu hợp lệ được duyệt. Bài regression cho thấy khách hàng bình thường không bị chặn nhầm."*
+  > *"Blue Team đề xuất cách sửa gốc bằng ràng buộc duy nhất ở cơ sở dữ liệu, kèm mẫu cho các nền tảng phổ biến. Khi bật bản vá trên hệ thống mẫu, chạy lại đúng đợt tấn công cũ và kiểm tra có đúng một yêu cầu hợp lệ được duyệt hay không. Dashboard hiển thị tỷ lệ chặn nhầm và độ trễ tăng thêm đo được trong lần chạy này."*
 
 ---
 
@@ -76,7 +89,7 @@ timeline
 
 * **Thao tác:**
   1. Arbiter mở **Financial Exposure Dossier**:
-     * Thất thoát trước vá / sau vá và số tiền giữ lại được **trong lần chạy này**.
+      * Thất thoát trước vá / sau vá và số tiền giữ lại được **trong lần chạy này**. Với voucher, không tính lượt nhận hợp lệ đầu tiên vào thất thoát: nếu 15 lượt thành công, $500/lượt thì tổng được duyệt $7,500 nhưng thất thoát trùng là $7,000.
      * Điểm an toàn heuristic trước → sau (điểm demo, không phải chứng nhận).
      * Bảng tuân thủ: các mục ở trạng thái `NOT_ASSESSED` / `VERIFIED_IN_MOCK_TARGET`.
   2. Hiển thị nội dung **Pull Request mô phỏng** (tiêu đề, branch, diff). AIGIS không gọi GitHub API.

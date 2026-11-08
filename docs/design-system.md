@@ -1,5 +1,9 @@
 # AIGIS — Brand & Design System Specification
-Documented per `web-design-engineer` Protocol.
+> Status: Design reference · Updated: 2026-11-08 · Scope: Dashboard visual guidance
+>
+> [Documentation index](README.md) · [Frontend check](reports/frontend-check.md)
+
+This document describes design intent. It is not a pixel-level audit of the current dashboard. Runtime behavior and observed viewport results are recorded separately in the frontend check.
 
 ## 1. Identity & Narrative
 - **Brand Name**: AIGIS
@@ -27,7 +31,7 @@ Design Read:
 ---
 
 ## 3. Four Positioning Questions
-1. **Narrative Role**: 
+1. **Narrative Role**:
    - *Hero*: High-altitude, scientific inspiration ("Evaluating what works at AI's frontier").
    - *Workbench*: Real-time adversarial proving ground where autonomous agents compete and self-heal.
 2. **Viewing Distance**: 1m desktop/laptop display (optimized for 1280px - 1920px viewports).

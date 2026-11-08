@@ -1,4 +1,8 @@
 # AIGIS — Adversarial Intelligence for Generative Immunity & Security
+> Status: Current · Updated: 2026-11-08 · Scope: Local simulation
+>
+> [Mục lục](README.md) · [Backend reliability](backend-reliability.md)
+
 **Đặc tả Kiến trúc Hệ thống (System Architecture & Technical Specification)**
 
 > [!IMPORTANT]
@@ -137,3 +141,45 @@ aigis/
 | Tạo PR thật qua GitHub API | Chưa |
 | Tỷ lệ gian lận và giá trị giao dịch sát thực tế | Chưa |
 | Kịch bản gian lận ngân hàng (thử thẻ, ATO, tài khoản mule) | Chưa |
+
+## 6. Evidence, isolation và replay
+
+### 6.1. Nguồn gốc và mức độ kết luận
+
+`backend/evidence.py` định nghĩa context bất biến cho dataset, phân tích và mô phỏng:
+
+- **Dataset:** đường dẫn chuẩn hóa, `dataset_id` và `dataset_revision` dựa trên metadata file/WAL. Revision dùng để vô hiệu hóa cache, không phải hash toàn bộ nội dung.
+- **Analysis:** endpoint, mốc đầu/cuối cửa sổ, số bản ghi, nguồn và độ đầy đủ. Các truy vấn liên quan dùng cùng read snapshot; thay đổi revision được đánh dấu stale.
+- **Simulation:** `run_id`, scenario, `workload_id`, phase, seed và cấu hình control. Attack/retest phải khớp scenario, workload và provenance để được chấm như một cặp trước/sau.
+
+| Assessment state | Ý nghĩa |
+| :--- | :--- |
+| `NOT_ASSESSED` | Chưa đánh giá |
+| `INSUFFICIENT_DATA` | Không đủ dữ liệu để kết luận |
+| `NO_SIGNAL_OBSERVED` | Không thấy tín hiệu trong phạm vi quan sát; không chứng minh hệ thống an toàn |
+| `SIGNAL_DETECTED` | Có tín hiệu telemetry; chưa chứng minh khai thác được lỗi isolation |
+| `EXPLOIT_REPRODUCED_IN_MOCK` | Tái hiện khai thác trên mock target |
+| `MITIGATION_VERIFIED_IN_MOCK` | Control đạt kiểm tra trên workload mock tương ứng |
+| `VERIFICATION_FAILED` | Kiểm tra không đạt |
+
+`UNSUPPORTED_DATASET` là trạng thái tương thích schema của diagnosis, không phải một assessment state. Copilot hiển thị số liệu không khả dụng thay vì tự điền khi dataset không hỗ trợ.
+
+### 6.2. Vòng đời và cô lập mô phỏng
+
+`backend/simulation.py` dùng `ContextVar` để cấp mock store riêng cho mỗi full workflow/training. Khi hoàn tất, lỗi hoặc hủy, context được khôi phục. Các round lưu từng cặp attack/retest và dossier; `dossier` tương thích là round cuối, `training_summary` chứa tổng hợp toàn bộ round.
+
+Các endpoint stage-by-stage cũ vẫn dùng **một session chia sẻ, được tuần tự hóa**. Khi dùng session này, chạy API với một worker. Dùng full workflow để chạy các thí nghiệm độc lập đồng thời.
+
+### 6.3. Lưu trữ và tái hiện
+
+`backend/run_store.py` lưu cấu hình/kết quả training và HTTP multi-cycle recheck vào `backend/datasets/aigis_runs.db`, độc lập với telemetry database đang chọn. Có thể đổi đường dẫn bằng `AIGIS_RUN_DB`.
+
+| Route | Method | Mục đích |
+| :--- | :---: | :--- |
+| `/api/v1/wargame/run_full` | POST | Chạy full workflow; nhận `rounds`, `burst_streams`, `seed` |
+| `/api/v1/wargame/train` | POST | Training nhiều round, hỗ trợ seed |
+| `/api/v1/wargame/recheck_multicycle` | POST | Kiểm tra nhiều cycle và lưu manifest |
+| `/api/v1/wargame/runs/{run_id}` | GET | Đọc cấu hình và evidence đã lưu |
+| `/api/v1/wargame/runs/{run_id}/replay` | POST | Chạy lại cấu hình/seed đã lưu, tạo run mới |
+
+Seed giúp tái hiện cấu hình và kết quả chức năng, không đảm bảo ID hoặc latency theo đồng hồ giống hệt. Chi tiết patch registry, performance và stress evaluation xem [Backend reliability](backend-reliability.md).
