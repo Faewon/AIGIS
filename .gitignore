@@ -30,6 +30,7 @@ scratch/*
 !scratch/check_docs.py
 !scratch/check_model_layout.cjs
 !scratch/benchmark_telemetry.py
+!scratch/review_confirmations.py
 *.bak
 scratch_classes.txt
 apply_sidebar_update.py
