@@ -11,6 +11,7 @@ Tự động tổng hợp bản vá đa ngôn ngữ và quy tắc WAF tại biê
 
 import re
 from typing import Dict, Any
+from backend.patch_registry import python_guard, metadata
 
 class MultiTargetPatchExporter:
 
@@ -59,49 +60,7 @@ COMMIT;
 """
 
         # 1. PYTHON FASTAPI PATCH
-        python_patch = f"""# ==============================================================================
-# AIGIS BLUE TEAM — PYTHON FASTAPI IDEMPOTENCY MIDDLEWARE (REFERENCE TEMPLATE)
-# Vulnerability: {vulnerability_type} on {endpoint}
-# Requires an upstream authentication middleware that sets request.state.user_id.
-# ==============================================================================
-import os
-import secrets
-from fastapi import Request
-from fastapi.responses import JSONResponse
-import redis.asyncio as aioredis
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-redis_client = aioredis.from_url(REDIS_URL)
-
-_RELEASE_LOCK_LUA = '''
-if redis.call("get", KEYS[1]) == ARGV[1] then
-    return redis.call("del", KEYS[1])
-end
-return 0
-'''
-
-async def aigis_concurrency_guard_middleware(request: Request, call_next):
-    if request.url.path == "{endpoint}" and request.method == "POST":
-        user_id = getattr(request.state, "user_id", None)
-        if not user_id:
-            return JSONResponse(status_code=401, content={{"success": False, "error": "Unauthenticated"}})
-
-        lock_key = f"aigis:lock:claim:{{user_id}}"
-        lock_value = secrets.token_hex(16)
-
-        # Atomic SET NX with a short lease. Never trust a client-supplied X-User-ID.
-        acquired = await redis_client.set(lock_key, lock_value, nx=True, ex=3)
-        if not acquired:
-            return JSONResponse(
-                status_code=429,
-                content={{"success": False, "error": "Too Many Requests: concurrent claim blocked by AIGIS."}}
-            )
-        try:
-            return await call_next(request)
-        finally:
-            await redis_client.eval(_RELEASE_LOCK_LUA, 1, lock_key, lock_value)
-    return await call_next(request)
-"""
+        python_patch = python_guard(endpoint)
 
         # 2. JAVA SPRING BOOT PATCH (Core Banking standard: Vietcombank / BIDV / Techcombank)
         java_patch = f"""// ==============================================================================
@@ -297,6 +256,7 @@ location {endpoint} {{
 }}"""
 
         return {
+            "template_metadata": metadata(),
             "vulnerability_type": vulnerability_type,
             "target_endpoint": endpoint,
             "languages": {

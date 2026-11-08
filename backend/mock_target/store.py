@@ -254,11 +254,14 @@ class VulnerableVoucherStore:
     # =========================================================================
     # 5. FINTECH RISK & VELOCITY ENGINE (Sardine & Feedzai inspired)
     # =========================================================================
-    def evaluate_transaction_risk(self, client_ip: str, user_id: str, amount: float, device_entropy: float = 0.85) -> Dict[str, Any]:
+    def evaluate_transaction_risk(self, client_ip: str, user_id: str, amount: float, device_entropy: float = 0.85, simulated_velocity: int | None = None) -> Dict[str, Any]:
         now = time.time()
         self.velocity_window = [r for r in self.velocity_window if (now - r["timestamp"]) < 10.0]
         ip_count = sum(1 for r in self.velocity_window if r["ip"] == client_ip)
-        self.velocity_window.append({"ip": client_ip, "user_id": user_id, "timestamp": now})
+        if simulated_velocity is None:
+            self.velocity_window.append({"ip": client_ip, "user_id": user_id, "timestamp": now})
+        else:
+            ip_count = simulated_velocity - 1
 
         # Calculate risk score 0 - 100
         risk_score = 15.0
@@ -301,4 +304,6 @@ class VulnerableVoucherStore:
             }
         }
 
-mock_store = VulnerableVoucherStore()
+from backend.simulation import StoreProxy
+
+mock_store = StoreProxy(VulnerableVoucherStore())

@@ -1,112 +1,53 @@
-try:
-    from backend.stream_engine import stream_engine
-except (ImportError, ModuleNotFoundError):
-    try:
-        from .stream_engine import stream_engine
-    except (ImportError, ModuleNotFoundError):
-        from stream_engine import stream_engine
+from backend.stream_engine import stream_engine
 
 from contextlib import asynccontextmanager
 
 
-try:
-    from backend.pii_scanner import global_pii_scanner
-    from backend.patch_exporter import global_patch_exporter
-except (ImportError, ModuleNotFoundError):
-    try:
-        from .pii_scanner import global_pii_scanner
-        from .patch_exporter import global_patch_exporter
-    except (ImportError, ModuleNotFoundError):
-        from pii_scanner import global_pii_scanner
-        from patch_exporter import global_patch_exporter
+from backend.pii_scanner import global_pii_scanner
+from backend.patch_exporter import global_patch_exporter
 
 import os
-import sys
 import hmac
+import json
+from backend.dashboard import build_dashboard
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 import html
 import secrets
 import uuid
+import time
+import threading
 from pathlib import Path
-
-# Ensure project root and backend dir are in sys.path
-_CURRENT_DIR = Path(__file__).resolve().parent
-_ROOT_DIR = _CURRENT_DIR.parent
-if str(_ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(_ROOT_DIR))
-if str(_CURRENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_CURRENT_DIR))
 
 import asyncio
 from typing import Dict, Any
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-try:
-    from backend.mock_target.store import mock_store
-    from backend.llm_engine import global_llm_engine
-    from backend.data_simulator import generate_million_row_dataset, get_dataset_metadata, CSV_PATH
-    from backend.database import (
-        get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
-        import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
-        get_table_schema, DB_PATH, init_db, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
-    )
-    from backend.text_to_sql import generate_sql_from_prompt
-    from backend.agents.rea_dissector import READissectorAgent
-    from backend.agents.red_cerebrus import RedCerebrusAgent
-    from backend.agents.sandbox_runner import SandboxRunnerAgent
-    from backend.agents.blue_aegis import BlueAegisAgent
-    from backend.agents.arbiter import ArenaArbiterAgent
-    from backend.agents.adversarial_trainer import global_adversarial_trainer
-    from backend.agents.fintech_sentinel import global_fintech_sentinel
-    from backend.agents.quant_investigator import global_quant_investigator
-    from backend.agents.secops_copilot import global_secops_copilot
-    from backend.agents.work_order_generator import global_work_order_generator
-    from backend.database import get_incident_memory, add_incident_memory, get_policy_rules, toggle_policy_rule
-except (ImportError, ModuleNotFoundError):
-    try:
-        from .mock_target.store import mock_store
-        from .llm_engine import global_llm_engine
-        from .data_simulator import generate_million_row_dataset, get_dataset_metadata, CSV_PATH
-        from .database import (
-            get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
-            import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
-            get_table_schema, DB_PATH, init_db, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
-        )
-        from .text_to_sql import generate_sql_from_prompt
-        from .agents.rea_dissector import READissectorAgent
-        from .agents.red_cerebrus import RedCerebrusAgent
-        from .agents.sandbox_runner import SandboxRunnerAgent
-        from .agents.blue_aegis import BlueAegisAgent
-        from .agents.arbiter import ArenaArbiterAgent
-        from .agents.adversarial_trainer import global_adversarial_trainer
-        from .agents.fintech_sentinel import global_fintech_sentinel
-        from .agents.quant_investigator import global_quant_investigator
-        from .agents.secops_copilot import global_secops_copilot
-        from .agents.work_order_generator import global_work_order_generator
-        from .database import get_incident_memory, add_incident_memory, get_policy_rules, toggle_policy_rule
-    except (ImportError, ModuleNotFoundError):
-        from mock_target.store import mock_store
-        from llm_engine import global_llm_engine
-        from data_simulator import generate_million_row_dataset, get_dataset_metadata, CSV_PATH
-        from database import (
-            get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
-            import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
-            get_table_schema, DB_PATH, init_db, list_uploaded_databases, delete_uploaded_database, get_database_model_graph, query_table_data
-        )
-        from text_to_sql import generate_sql_from_prompt
-        from agents.rea_dissector import READissectorAgent
-        from agents.red_cerebrus import RedCerebrusAgent
-        from agents.sandbox_runner import SandboxRunnerAgent
-        from agents.blue_aegis import BlueAegisAgent
-        from agents.arbiter import ArenaArbiterAgent
-        from agents.adversarial_trainer import global_adversarial_trainer
-        from agents.fintech_sentinel import global_fintech_sentinel
-        from agents.quant_investigator import global_quant_investigator
-        from agents.secops_copilot import global_secops_copilot
-        from agents.work_order_generator import global_work_order_generator
-        from database import get_incident_memory, add_incident_memory, get_policy_rules, toggle_policy_rule
+from backend.mock_target.store import mock_store
+from backend.llm_engine import global_llm_engine
+from backend.data_simulator import generate_million_row_dataset, get_dataset_metadata, CSV_PATH
+from backend.database import (
+    get_db_stats, query_telemetry_rows, execute_raw_sql, import_csv_to_db,
+    import_custom_csv_to_db, set_active_db, get_active_db_info, get_db_tables,
+    get_table_schema, DB_PATH, init_db, list_uploaded_databases,
+    delete_uploaded_database, get_database_model_graph, query_table_data,
+    get_incident_memory, add_incident_memory, get_policy_rules, toggle_policy_rule,
+)
+from backend.text_to_sql import generate_sql_from_prompt
+from backend.agents.rea_dissector import READissectorAgent
+from backend.agents.red_cerebrus import RedCerebrusAgent
+from backend.agents.sandbox_runner import SandboxRunnerAgent
+from backend.agents.blue_aegis import BlueAegisAgent
+from backend.agents.arbiter import ArenaArbiterAgent
+from backend.agents.adversarial_trainer import global_adversarial_trainer
+from backend.agents.fintech_sentinel import global_fintech_sentinel
+from backend.agents.quant_investigator import global_quant_investigator
+from backend.agents.secops_copilot import global_secops_copilot
+from backend.agents.work_order_generator import global_work_order_generator
+from backend.simulation import simulation_scope
+from backend.run_store import get_run, save_run
+from backend.observability import event
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -129,6 +70,56 @@ async def lifespan(app: FastAPI):
 
 AIGIS_API_TOKEN = os.getenv("AIGIS_API_TOKEN") or secrets.token_urlsafe(32)
 _ENABLE_DOCS = os.getenv("AIGIS_ENABLE_DOCS", "0") == "1"
+
+
+class ApiInput(BaseModel):
+    """Shared validation for JSON fields used by the dashboard API."""
+    model_config = ConfigDict(extra="allow", allow_inf_nan=False)
+    max_limit: int = Field(default=50, ge=1, le=10000)
+    burst_streams: int = Field(default=15, ge=1, le=100)
+    cycles: int = Field(default=5, ge=1, le=20)
+    rounds: int = Field(default=1, ge=1, le=10)
+    total_rows: int = Field(default=1000000, ge=1, le=2000000)
+    attack_ratio: float = Field(default=0.01, ge=0, le=0.5)
+    sample_limit: int = Field(default=5000, ge=1, le=1000000)
+    tps: int = Field(default=10, ge=1, le=200)
+    window_seconds: int = Field(default=60, ge=1, le=3600)
+    limit: int = Field(default=5, ge=1, le=10000)
+    amount: float = 500.0
+    device_entropy: float = Field(default=0.85, ge=0, le=1)
+    simulated_velocity: int | None = Field(default=None, ge=1, le=10000)
+    is_active: int = Field(default=1, ge=0, le=1)
+    provider: str = "heuristic"
+    api_key: str = ""
+    model_name: str = ""
+    base_url: str = ""
+    query: str = ""
+    db_path: str = ""
+    prompt: str = ""
+    execute: bool = True
+    filename: str | None = None
+    scenario: str = ""
+    content: str = ""
+    raw_spec: str = "{}"
+    client_ip: str = ""
+    user_id: str = ""
+    voucher_code: str = ""
+    rule_id: str = ""
+    target_endpoint: str = ""
+    threat_type: str = ""
+    incident_id: str | None = None
+    epoch_ms: int = Field(default=0, ge=0)
+    timestamp: str = ""
+    severity: str = ""
+    velocity_tps: float = 0.0
+    financial_loss: float = 0.0
+    rca_summary: str = ""
+    remediation_patch: str = ""
+    status: str = ""
+    seed: int | None = Field(default=None, ge=0, le=4294967295)
+
+
+_simulation_lock = threading.Lock()
 
 app = FastAPI(
     title="AIGIS Autonomous Wargame Engine",
@@ -156,10 +147,44 @@ async def local_api_auth_middleware(request: Request, call_next):
             supplied = request.query_params.get("token", "")
         if not hmac.compare_digest(supplied, AIGIS_API_TOKEN):
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-    response = await call_next(request)
+        if request.method in {"POST", "PUT", "PATCH"} and not request.url.path.endswith(("/upload_db", "/upload_csv")):
+            try:
+                raw = await request.body()
+                body = json.loads(raw) if raw else {}
+                validated = ApiInput.model_validate(body)
+                normalized = validated.model_dump(exclude_unset=True)
+                request._body = json.dumps(normalized).encode()
+                request._json = normalized
+            except (ValueError, ValidationError):
+                return JSONResponse(status_code=422, content={"detail": "Invalid request body or field value"})
+    request_id = uuid.uuid4().hex
+    started = time.perf_counter()
+    path = request.url.path
+    isolated = path in {"/api/v1/wargame/run_full", "/api/v1/wargame/train", "/api/v1/wargame/scenario/run"}
+    shared_mutation = request.method == "POST" and (
+        path.startswith(("/api/v1/target/", "/api/v1/voucher/", "/api/v1/fintech/", "/api/v1/wargame/stage/"))
+        or path == "/api/v1/wargame/recheck_multicycle")
+    if shared_mutation:
+        while not _simulation_lock.acquire(blocking=False):
+            await asyncio.sleep(0.01)
+    try:
+        if isolated:
+            body = await request.json()
+            with simulation_scope(body.get("seed")) as run:
+                request.state.simulation_run = run
+                response = await call_next(request)
+        else:
+            response = await call_next(request)
+    finally:
+        if shared_mutation:
+            _simulation_lock.release()
+    event("http.completed", request_id=request_id, method=request.method, path=path,
+          status=response.status_code, duration_ms=round((time.perf_counter()-started)*1000, 2))
+    response.headers["X-Request-ID"] = request_id
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Cache-Control", "no-store")
     return response
 
 # Khởi tạo các Agent
@@ -358,6 +383,7 @@ async def run_multicycle_recheck_endpoint(request: Request = None):
     """Chạy kiểm tra lại nhiều chu kỳ liên tiếp với vi sai thời gian ngẫu nhiên (Multi-Cycle Retest)"""
     cycles = 5
     burst_count = 15
+    body = {}
     if request:
         try:
             body = await request.json()
@@ -367,7 +393,17 @@ async def run_multicycle_recheck_endpoint(request: Request = None):
             pass
     cycles = min(cycles, 20)
     burst_count = min(burst_count, 100)
-    return await global_adversarial_trainer.run_multicycle_recheck(cycles=cycles, burst_streams=burst_count)
+    # Copy the deployed control configuration into an isolated retest store.
+    enabled, modules = mock_store.patch_enabled, dict(mock_store.patch_modules)
+    with simulation_scope(body.get("seed") if request else None) as run:
+        mock_store.patch_enabled, mock_store.patch_modules = enabled, modules
+        result = await global_adversarial_trainer.run_multicycle_recheck(
+            cycles=cycles, burst_streams=burst_count, seed=run["seed"])
+        config = {**run, "kind": "recheck", "cycles": cycles, "burst_streams": burst_count,
+                  "patch_enabled": enabled, "patch_modules": modules}
+        result.update(run_id=run["run_id"], configuration=config)
+        await asyncio.to_thread(save_run, run["run_id"], config, result)
+        return result
 
 @app.post("/api/v1/wargame/stage/6_dossier")
 async def run_stage_dossier():
@@ -385,6 +421,7 @@ async def train_adversarial_wargame(request: Request = None):
     """Huấn luyện đối kháng đa vòng Red vs Blue (Co-Evolution Training)"""
     rounds = 3
     burst_count = 15
+    body = {}
     if request:
         try:
             body = await request.json()
@@ -395,75 +432,53 @@ async def train_adversarial_wargame(request: Request = None):
     rounds = min(rounds, 10)
     burst_count = min(burst_count, 100)
             
-    result = await global_adversarial_trainer.train_adversarial_rounds(total_rounds=rounds, burst_streams=burst_count)
-    wargame_state["training_history"] = result.get("rounds_history", [])
-    wargame_state["dossier"] = result.get("dossier", {})
-    wargame_state["current_stage"] = "WARGAME_FINISHED"
+    result = await global_adversarial_trainer.train_adversarial_rounds(
+        total_rounds=rounds, burst_streams=burst_count, seed=body.get("seed") if request else None)
     return result
 
 @app.post("/api/v1/wargame/run_full")
 async def run_full_wargame(request: Request = None):
     """Chạy toàn bộ 5 Agent Wargame trong 1 chu trình duy nhất"""
-    burst_count = 15
-    rounds = 1
-    if request:
-        try:
-            body = await request.json()
-            burst_count = int(body.get("burst_streams", 15))
-            rounds = int(body.get("rounds", 1))
-        except Exception:
-            pass
-    burst_count = min(burst_count, 100)
-    rounds = min(rounds, 10)
-
-    if rounds > 1:
-        return await train_adversarial_wargame(request)
-
-    # Reset trước
-    mock_store.reset()
-
-    # Bước 1: REA Dissector
-    rea_res = await rea_agent.analyze_target(BUNDLE_FILE)
-    wargame_state["rea_report"] = rea_res
-
-    # Bước 2: Red Team Cerebrus
-    red_res = await red_agent.generate_attack_plan(rea_res, concurrency_burst=burst_count)
-    wargame_state["red_report"] = red_res
-
-    # Bước 3: Initial Exploit (Hệ thống chưa vá)
-    attack_res = await sandbox_agent.execute_burst_attack("usr_attacker_cerebrus_01", "TET2026_VIP", burst_count, 500.0)
-    wargame_state["initial_attack_report"] = attack_res
-
-    # Bước 4: Blue Team Aegis Synthesize & Deploy Patch
-    patch_res = await blue_agent.analyze_and_synthesize_patch(attack_res)
-    wargame_state["patch_report"] = patch_res
-
-    # Bước 5: Retest sau vá & Zero Regression
-    retest_res = await sandbox_agent.execute_burst_attack("usr_attacker_cerebrus_01", "TET2026_VIP", burst_count, 500.0)
-    wargame_state["retest_attack_report"] = retest_res
-    regression_res = await blue_agent.run_zero_regression_test(50)
-    wargame_state["regression_report"] = regression_res
-
-    # Bước 6: Arbiter Dossier & 1-Click PR
-    dossier_res = await arbiter_agent.generate_dossier(attack_res, patch_res, regression_res, retest_res)
-    wargame_state["dossier"] = dossier_res
-    wargame_state["current_stage"] = "WARGAME_FINISHED"
-
-    return {
-        "status": "SUCCESS",
-        "stage": "WARGAME_FINISHED",
-        "rea": rea_res,
-        "red_team": red_res,
-        "initial_attack": attack_res,
-        "blue_team": patch_res,
-        "retest": retest_res,
-        "regression": regression_res,
-        "dossier": dossier_res
-    }
+    body = await request.json() if request else {}
+    result = await global_adversarial_trainer.train_adversarial_rounds(
+        total_rounds=body.get("rounds", 1), burst_streams=body.get("burst_streams", 15), seed=body.get("seed"))
+    pair = result["round_evidence"][-1]
+    rea = await rea_agent.analyze_target(BUNDLE_FILE)
+    red = await red_agent.generate_attack_plan(rea, concurrency_burst=body.get("burst_streams", 15))
+    return {**result, "stage": "WARGAME_FINISHED", "initial_attack": pair["attack"],
+            "rea": rea, "red_team": red,
+            "blue_team": {"patch_code": global_adversarial_trainer.generate_composite_patch_diff([])},
+            "retest": pair["retest"], "regression": result["regression_report"]}
 
 @app.get("/api/v1/wargame/state")
 async def get_wargame_state():
     return wargame_state
+
+
+@app.get("/api/v1/wargame/runs/{run_id}")
+async def get_simulation_run(run_id: str):
+    result = await asyncio.to_thread(get_run, run_id)
+    return result if result else JSONResponse(status_code=404, content={"error": "Run not found"})
+
+
+@app.post("/api/v1/wargame/runs/{run_id}/replay")
+async def replay_simulation_run(run_id: str):
+    saved = await asyncio.to_thread(get_run, run_id)
+    if not saved:
+        return JSONResponse(status_code=404, content={"error": "Run not found"})
+    config = saved["configuration"]
+    if config.get("kind") == "recheck":
+        with simulation_scope(config["seed"]) as run:
+            mock_store.patch_enabled = config["patch_enabled"]
+            mock_store.patch_modules = config["patch_modules"]
+            result = await global_adversarial_trainer.run_multicycle_recheck(
+                config["cycles"], config["burst_streams"], seed=config["seed"])
+            replay_config = {**config, **run}
+            result.update(run_id=run["run_id"], configuration=replay_config)
+            await asyncio.to_thread(save_run, run["run_id"], replay_config, result)
+            return result
+    return await global_adversarial_trainer.train_adversarial_rounds(
+        total_rounds=config["total_rounds"], burst_streams=config["burst_streams"], seed=config["seed"])
 
 # ==============================================================================
 # 4. DATASET EXPLORER & SYNTHETIC TELEMETRY (1,000,000 ROWS)
@@ -479,6 +494,7 @@ async def generate_dataset_endpoint(request: Request = None):
     """Sinh tập dữ liệu mô phỏng 1,000,000 dòng cực kỳ chi tiết"""
     total_rows = 1_000_000
     attack_ratio = 0.035
+    body = {}
     if request:
         try:
             body = await request.json()
@@ -489,7 +505,8 @@ async def generate_dataset_endpoint(request: Request = None):
     total_rows = max(1, min(total_rows, 2_000_000))
     attack_ratio = max(0.001, min(attack_ratio, 0.5))
 
-    stats = await asyncio.to_thread(generate_million_row_dataset, total_rows=total_rows, attack_ratio=attack_ratio)
+    stats = await asyncio.to_thread(generate_million_row_dataset, total_rows=total_rows, attack_ratio=attack_ratio,
+                                    seed=body.get("seed") if request else None)
     return stats
 
 @app.get("/api/v1/dataset/download")
@@ -554,6 +571,9 @@ async def connect_database_endpoint(request: Request):
     """Kết nối thẳng tới một file SQLite Database (.db, .sqlite) trên máy"""
     body = await request.json()
     db_path = body.get("db_path", "").strip()
+    if body.get("db_path") == "default":
+        from backend.database import DB_PATH as default_db_path
+        db_path = default_db_path
     if not db_path:
         return JSONResponse(status_code=400, content={"success": False, "error": "Missing db_path parameter"})
     res = set_active_db(db_path)
@@ -561,18 +581,24 @@ async def connect_database_endpoint(request: Request):
 
 async def _stream_upload_to_disk(file: UploadFile, dest_path: Path, max_bytes: int = 50 * 1024 * 1024) -> tuple[bool, str]:
     total = 0
-    with open(dest_path, "wb") as fout:
-        async for chunk in file:
-            total += len(chunk)
-            if total > max_bytes:
-                fout.close()
-                try:
-                    dest_path.unlink(missing_ok=True)
-                except OSError:
-                    pass
-                return False, "File exceeds 50 MB limit"
-            fout.write(chunk)
-    return True, ""
+    completed = False
+    created = False
+    try:
+        with open(dest_path, "xb") as fout:
+            created = True
+            while chunk := await file.read(1024 * 1024):
+                total += len(chunk)
+                if total > max_bytes:
+                    return False, "File exceeds upload size limit"
+                fout.write(chunk)
+        completed = True
+        return True, ""
+    finally:
+        try:
+            if created and not completed:
+                dest_path.unlink(missing_ok=True)
+        finally:
+            await file.close()
 
 
 @app.post("/api/v1/database/upload_db")
@@ -683,10 +709,7 @@ async def classify_dataset_traffic(request: Request = None):
             sample_limit = int(body.get("sample_limit", 5000))
         except Exception:
             pass
-    try:
-        from backend.traffic_classifier import run_autonomous_dataset_classification
-    except Exception:
-        from traffic_classifier import run_autonomous_dataset_classification
+    from backend.traffic_classifier import run_autonomous_dataset_classification
     res = await asyncio.to_thread(run_autonomous_dataset_classification, sample_limit=sample_limit)
     return res
 
@@ -701,10 +724,7 @@ async def classify_dataset_deep_dive(request: Request = None):
             sample_limit = int(body.get("sample_limit", 10000))
         except Exception:
             pass
-    try:
-        from backend.traffic_classifier import run_deep_dive_traffic_classification
-    except Exception:
-        from traffic_classifier import run_deep_dive_traffic_classification
+    from backend.traffic_classifier import run_deep_dive_traffic_classification
     res = await run_deep_dive_traffic_classification(sample_limit=sample_limit)
     return res
 
@@ -712,12 +732,34 @@ async def classify_dataset_deep_dive(request: Request = None):
 async def serve_dashboard():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            dashboard = f.read()
+        dashboard, _ = build_dashboard(index_path)
         token_meta = f'<meta name="aigis-token" content="{html.escape(AIGIS_API_TOKEN, quote=True)}">'
         dashboard = dashboard.replace("</head>", token_meta + "\n</head>", 1)
-        return HTMLResponse(content=dashboard)
+        policy = ("default-src 'self'; script-src 'self'; worker-src 'self'"
+                  + "; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
+        return HTMLResponse(content=dashboard, headers={"Content-Security-Policy": policy})
     return HTMLResponse(content="<h1>AIGIS Dashboard not found in frontend/index.html</h1>", status_code=404)
+
+
+@app.get("/assets/model-layout-worker.js")
+async def model_layout_worker():
+    return FileResponse(os.path.join(FRONTEND_DIR, "model-layout-worker.js"), media_type="text/javascript")
+
+
+@app.get("/assets/model-layout.js")
+async def model_layout_engine():
+    return FileResponse(os.path.join(FRONTEND_DIR, "model-layout.js"), media_type="text/javascript")
+
+
+@app.get("/assets/vendor/elk.bundled.js")
+async def model_layout_vendor():
+    return FileResponse(os.path.join(FRONTEND_DIR, "vendor", "elk.bundled.js"), media_type="text/javascript")
+
+
+@app.get("/assets/dashboard.js")
+async def dashboard_script():
+    _, script = build_dashboard(os.path.join(FRONTEND_DIR, "index.html"))
+    return Response(script, media_type="text/javascript")
 
 if __name__ == "__main__":
     import uvicorn
@@ -863,6 +905,7 @@ async def evaluate_fintech_risk_endpoint(request: Request = None):
     user_id = "usr_client_889"
     amount = 5000.0
     device_entropy = 0.85
+    simulated_velocity = None
     if request:
         try:
             body = await request.json()
@@ -870,6 +913,7 @@ async def evaluate_fintech_risk_endpoint(request: Request = None):
             user_id = body.get("user_id", "usr_client_889")
             amount = float(body.get("amount", 5000.0))
             device_entropy = float(body.get("device_entropy", 0.85))
+            simulated_velocity = body.get("simulated_velocity")
         except Exception:
             pass
 
@@ -877,7 +921,8 @@ async def evaluate_fintech_risk_endpoint(request: Request = None):
         client_ip=client_ip,
         user_id=user_id,
         amount=amount,
-        device_entropy=device_entropy
+        device_entropy=device_entropy,
+        simulated_velocity=simulated_velocity,
     )
 
 @app.post("/api/v1/fintech/velocity_rule")

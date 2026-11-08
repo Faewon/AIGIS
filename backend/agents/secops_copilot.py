@@ -18,22 +18,10 @@ def _has_intent(text: str, keywords: List[str]) -> bool:
     """Whole-word/phrase match so short keys ("rca", "kb", "past") don't fire inside other words."""
     return any(re.search(r"(?<!\w)" + re.escape(k) + r"(?!\w)", text) for k in keywords)
 
-try:
-    from ..database import get_connection, get_incident_memory, get_policy_rules, DB_PATH
-    from ..llm_engine import global_llm_engine
-    from .fintech_sentinel import global_fintech_sentinel
-    from .quant_investigator import global_quant_investigator
-except (ImportError, ModuleNotFoundError):
-    try:
-        from database import get_connection, get_incident_memory, get_policy_rules, DB_PATH
-        from llm_engine import global_llm_engine
-        from fintech_sentinel import global_fintech_sentinel
-        from quant_investigator import global_quant_investigator
-    except (ImportError, ModuleNotFoundError):
-        from backend.database import get_connection, get_incident_memory, get_policy_rules, DB_PATH
-        from backend.llm_engine import global_llm_engine
-        from backend.agents.fintech_sentinel import global_fintech_sentinel
-        from backend.agents.quant_investigator import global_quant_investigator
+from backend.database import get_connection, get_incident_memory, get_policy_rules, DB_PATH
+from backend.llm_engine import global_llm_engine
+from backend.agents.fintech_sentinel import global_fintech_sentinel
+from backend.agents.quant_investigator import global_quant_investigator
 
 
 class SecOpsCopilotAgent:
@@ -72,15 +60,24 @@ class SecOpsCopilotAgent:
             rca = inv_report.get("root_cause_analysis", {})
             qm = inv_report.get("quantitative_metrics", {})
 
+            if inv_report.get("status") == "UNSUPPORTED_DATASET" or not qm.get("total_analyzed"):
+                return {"query": query, "reply": (
+                    "**Diagnosis unavailable:** " + (inv_report.get("error") or
+                    "No telemetry events were observed in the requested window.") +
+                    " No vulnerability gap, loss, or mitigation has been verified."),
+                    "handoff_invoked": True, "investigator_data": inv_report,
+                    "assessment_state": "INSUFFICIENT_DATA", "suggested_actions": [],
+                    "latency_ms": round((time.time() - t0) * 1000, 1)}
+
             reply = (
                 f"**Deep Investigation Results from Deep Quant Investigator (Sandbox Python):**\n\n"
                 f"- **Target Endpoint**: `{inv_report.get('target_endpoint')}`\n"
                 f"- **Threat Classification**: `{inv_report.get('threat_type')}`\n"
-                f"- **Micro Vulnerability Gap**: **{rca.get('vulnerability_gap_ms', 1.45):.2f}ms** (Minimum observed: **{rca.get('min_observed_gap_ms', 0.42):.2f}ms**)\n"
-                f"- **Dirty Read Probability**: **{rca.get('dirty_read_probability', 0.933)*100:.1f}%** ({qm.get('dirty_read_count', 14)}/{qm.get('total_analyzed', 15)} burst requests bypassed balance check)\n"
-                f"- **Estimated Capital Exposure**: **${rca.get('capital_loss_usd', 7500.0):,.2f}** per burst exploit\n\n"
+                f"- **Observed Mean Inter-arrival Gap**: **{rca.get('vulnerability_gap_ms', 0):.2f}ms**\n"
+                f"- **Repeated-success Signal Ratio**: **{rca.get('dirty_read_probability', 0)*100:.1f}%** ({qm.get('dirty_read_count', 0)}/{qm.get('total_analyzed', 0)} analyzed events)\n"
+                f"- **Estimated Duplicate Value**: **${rca.get('capital_loss_usd', 0):,.2f}** in this window\n\n"
                 f"> **Root Cause Analysis (RCA) Verdict:** {rca.get('rca_summary')}\n\n"
-                f"**Verified Defense Patch:** {rca.get('remediation_patch')}"
+                f"**Suggested Reference Control (not verified by telemetry):** {rca.get('remediation_patch')}"
             )
             suggested_actions = [
                 {"label": "Generate Remediation Work Order", "action": "open_work_order"},
@@ -90,7 +87,8 @@ class SecOpsCopilotAgent:
 
         # 2. INTENT: Sentinel Status & System Health
         elif _has_intent(q, ["tấn công", "tan cong", "sentinel", "trạng thái", "trang thai", "sức khỏe", "suc khoe", "health", "drift", "bình thường", "binh thuong", "attack", "status", "normal", "under attack", "posture"]):
-            sent_status = global_fintech_sentinel.get_status().get("current_state", {})
+            import asyncio
+            sent_status = await asyncio.to_thread(global_fintech_sentinel.evaluate_telemetry)
             verdict = sent_status.get("verdict", "NORMAL")
             tps = sent_status.get("tps", 10.0)
             fc30 = sent_status.get("tail_forecast_t30", 10.0)
@@ -101,10 +99,10 @@ class SecOpsCopilotAgent:
             reason_en = reason
             if "nominal" in reason.lower():
                 reason_en = "System operating within nominal safety thresholds; no micro-concurrency collisions or anomalous exploit patterns detected."
-            elif "surge" in reason.lower() and "flash sale" in reason.lower():
+            elif verdict == "STAND_DOWN":
                 reason_en = "Transaction traffic surging, but Contextual Filter confirms active authorized Flash Sale with dispersed residential IPs. Sentinel standing down to prevent false positive customer blocks."
-            elif "concurrency clustering" in reason.lower() or "exploit" in reason.lower():
-                reason_en = "Sub-millisecond concurrency collision cluster detected. High probability of active TOCTOU race exploit or Sybil bot attack. Recommending autonomous handoff to Deep Investigator."
+            elif verdict == "CRITICAL_ANOMALY":
+                reason_en = reason + " This is a heuristic signal, not proof of exploitation."
 
             reply = (
                 f"**Real-Time Monitoring Report from FinTech Sentinel:**\n\n"
@@ -166,9 +164,11 @@ class SecOpsCopilotAgent:
 
         # 5. INTENT: Work Order Generation
         elif _has_intent(q, ["work order", "phiếu", "phieu", "khắc phục", "khac phuc", "canary", "rollout", "lệnh sửa", "lenh sua", "remediation", "patch"]):
+            from backend.agents.work_order_generator import global_work_order_generator
+            ticket = global_work_order_generator.generate_work_order()
             reply = (
                 f"**SecOps Technical Intervention Work Order:**\n\n"
-                f"- **Work Order ID**: `WO-2026-0814` (Priority: `P0_CRITICAL`)\n"
+                f"- **Work Order ID**: `{ticket['ticket_id']}` (Priority: `{ticket['priority']}`; draft preview)\n"
                 f"- **Affected Component**: `/api/v1/voucher/claim` (Loyalty & Checkout Microservice)\n"
                 f"- **Proposed Patch**: Redis Distributed Mutex (`lock_ttl = 3.0s`) on key `lock:voucher:{{user_id}}`\n"
                 f"- **Canary Rollout Specification**:\n"

@@ -3,6 +3,7 @@ import sqlite3
 import time
 from typing import Dict, Any, List, Optional
 from .database import get_connection, get_db_tables, get_active_db_info
+from .evidence import dataset_identity
 
 
 def _quote_table(name: str) -> str:
@@ -28,7 +29,7 @@ def _evaluation_metrics(tp: int, fp: int, tn: int, fn: int,
 
     precision = _pct(tp, tp + fp)
     recall = _pct(tp, tp + fn)
-    f1 = round(2 * precision * recall / (precision + recall), 2) if precision and recall else None
+    f1 = (round(2 * precision * recall / (precision + recall), 2) if precision + recall else 0.0) if precision is not None and recall is not None else None
 
     delays = sorted(b[1] - b[0] for b in bursts.values() if b[1] is not None)
     missed_bursts = sum(1 for b in bursts.values() if b[1] is None)
@@ -146,11 +147,12 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
         return {"success": False, "error": f"Database not found: {active_path}"}
 
     sample_limit = max(1, min(int(sample_limit), 50000))
-    conn = get_connection()
+    conn = get_connection(active_path, read_only=True)
+    conn.execute("BEGIN")
     cur = conn.cursor()
 
     try:
-        tables = get_db_tables()
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
         if not tables:
             return {"success": False, "error": "No tables found in database."}
 
@@ -234,6 +236,9 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
 
         return {
             "success": True,
+            "dataset": dataset_identity(active_path).model_dump(),
+            "coverage_complete": sample_size == total_in_db,
+            "sampling_method": "FIRST_ROWS_NOT_REPRESENTATIVE",
             "database_name": db_info.get("active_db_name"),
             "target_table": target_table,
             "total_records_in_db": total_in_db,
@@ -263,6 +268,11 @@ def run_autonomous_dataset_classification(sample_limit: int = 5000) -> Dict[str,
 
 
 async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable_llm: bool = True) -> Dict[str, Any]:
+    import asyncio
+    return await asyncio.to_thread(_deep_dive_sync, sample_limit)
+
+
+def _deep_dive_sync(sample_limit: int = 10000) -> Dict[str, Any]:
     """
     Hệ thống AI Deep-Dive Traffic Forensics của AIGIS:
     Thực hiện phân tích đa tầng (Multi-Stage Deep Forensics):
@@ -278,11 +288,14 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
 
     sample_limit = max(1, min(int(sample_limit), 50000))
     t_start = time.time()
-    conn = get_connection()
+    conn = get_connection(active_path, read_only=True)
+    conn.execute("BEGIN")
     cur = conn.cursor()
 
     try:
-        tables = get_db_tables()
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+        if not tables:
+            return {"success": False, "error": "No tables found in database."}
         target_table = "telemetry" if "telemetry" in tables else tables[0]
         quoted_table = _quote_table(target_table)
 
@@ -405,6 +418,9 @@ async def run_deep_dive_traffic_classification(sample_limit: int = 10000, enable
         return {
             "success": True,
             "mode": "DEEP_DIVE_FORENSICS",
+            "dataset": dataset_identity(active_path).model_dump(),
+            "coverage_complete": sample_size == total_in_db,
+            "sampling_method": "FIRST_ROWS_NOT_REPRESENTATIVE",
             "total_records_in_db": total_in_db,
             "sample_analyzed": sample_size,
             "classified_attacks": attack_count,

@@ -12,27 +12,23 @@ import time
 import math
 from typing import Dict, Any, List, Optional
 from collections import deque
+from contextlib import closing
 
-try:
-    from ..database import get_connection, get_policy_rules, get_incident_memory, DB_PATH
-    from ..stream_engine import stream_engine
-except (ImportError, ModuleNotFoundError):
-    try:
-        from database import get_connection, get_policy_rules, get_incident_memory, DB_PATH
-        from stream_engine import stream_engine
-    except (ImportError, ModuleNotFoundError):
-        from backend.database import get_connection, get_policy_rules, get_incident_memory, DB_PATH
-        from backend.stream_engine import stream_engine
+from backend.database import get_connection, get_policy_rules, get_incident_memory, DB_PATH, get_active_db_path
+from backend.telemetry_analysis import sentinel_window
+from backend.evidence import dataset_identity, analysis_context
+from backend.stream_engine import stream_engine
 
 
 class FinTechSentinelAgent:
-    def __init__(self, db_path: str = DB_PATH):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path
         self.agent_name = "FinTech Sentinel"
         self.agent_role = "Autonomous Operational Surveillance & Contextual Stand-Down Agent"
         
         # Sliding history of evaluations for UI trend chart (last 30 samples)
         self.evaluation_history = deque(maxlen=30)
+        self._dataset_key = None
         
         # Internal state tracking
         self.last_eval_time = time.time()
@@ -73,6 +69,19 @@ class FinTechSentinelAgent:
         window_ms = window_seconds * 1000
         min_epoch = now_ms - window_ms
         is_simulated = events_override is not None
+        coverage_complete = True
+        database_path = self.db_path or get_active_db_path()
+        identity = dataset_identity(database_path)
+        dataset_key = (identity.dataset_id, identity.dataset_revision)
+        # Keep derivatives within a dataset; revisions invalidate cached results,
+        # but streaming appends should not reset derivatives on every evaluation.
+        if self._dataset_key and self._dataset_key != dataset_key:
+            self.evaluation_history.clear()
+            if self._dataset_key[0] != dataset_key[0]:
+                self.last_tps = 0.0
+                self.last_eval_time = now - window_seconds
+        self._dataset_key = dataset_key
+        snapshot = None
 
         thought_chain = []
         thought_chain.append(f"[THOUGHT 1] Sentinel scanning operational sliding window: last {window_seconds}s (epoch >= {min_epoch}).")
@@ -84,25 +93,19 @@ class FinTechSentinelAgent:
             thought_chain.append("[DATA SOURCE] Synthetic scenario fixture (not live production telemetry).")
         else:
             try:
-                conn = get_connection(self.db_path)
-                cur = conn.cursor()
-                cur.execute("""
-                SELECT event_id, epoch_ms, user_id, api_endpoint, transaction_amount_usd,
-                       is_attack, attack_type, is_datacenter_proxy, burst_stream_id,
-                       network_rtt_ms, server_latency_ms
-                FROM telemetry
-                WHERE epoch_ms >= ?
-                ORDER BY epoch_ms DESC
-                LIMIT 500
-                """, (min_epoch,))
-                events = [dict(r) for r in cur.fetchall()]
-                conn.close()
+                snapshot = sentinel_window(database_path, window_seconds, now_ms)
             except Exception as e:
+                coverage_complete = False
                 thought_chain.append(f"[WARNING] Fallback to in-memory stream buffer: {str(e)}")
                 # Fallback to in-memory events from stream_engine
-                events = list(stream_engine.recent_events)
+                # Never substitute the default stream for a selected custom dataset.
+                events = ([dict(e) for e in stream_engine.get_events(limit=50)
+                           if min_epoch <= e.get("epoch_ms", 0) <= now_ms]
+                          if dataset_identity(DB_PATH).dataset_id == identity.dataset_id else [])
 
         total_events = len(events)
+        if snapshot:
+            total_events = snapshot["total"]
         elapsed_sec = max(1.0, now - self.last_eval_time)
         current_tps = round(total_events / max(1.0, float(window_seconds)), 2)
         
@@ -120,6 +123,9 @@ class FinTechSentinelAgent:
 
         proxy_count = sum(1 for e in events if e.get("is_datacenter_proxy") == 1)
         proxy_ratio = round(proxy_count / max(1, total_events), 3)
+        if snapshot:
+            user_entropy = snapshot["user_entropy"]
+            proxy_ratio = snapshot["proxy_ratio"]
 
         # Detect sub-50ms concurrency clusters per user
         user_timestamps: Dict[str, List[int]] = {}
@@ -146,10 +152,16 @@ class FinTechSentinelAgent:
             b for b in (e.get("burst_stream_id") for e in events)
             if b and str(b) not in ("NONE", "null", "None", "")
         }
+        if snapshot:
+            concurrency_clusters = snapshot["concurrency_clusters"]
+            clustered_users = snapshot["clustered_users"]
+            burst_streams = set(snapshot["burst_streams"])
 
         # Calculate high-risk voucher drain velocity
         voucher_claims = [e for e in events if "/voucher/claim" in str(e.get("api_endpoint", ""))]
         voucher_drain_usd = sum(float(e.get("transaction_amount_usd", 0.0)) for e in voucher_claims)
+        if snapshot:
+            voucher_drain_usd = snapshot["drain"]
         drain_velocity_usd_s = round(voucher_drain_usd / max(1.0, float(window_seconds)), 2)
 
         # 3. Signal Tail Forecasting (extrapolating 30 seconds ahead)
@@ -168,7 +180,8 @@ class FinTechSentinelAgent:
         )
 
         # 4. Contextual Filter (Check active business policies & promotional windows)
-        policies = policies_override if policies_override is not None else get_policy_rules()
+        policies = (policies_override if policies_override is not None else
+                    snapshot["policies"] if snapshot else [])
         flash_sale_active = False
         flash_sale_rule = None
         burst_ceiling = 30.0
@@ -268,11 +281,18 @@ class FinTechSentinelAgent:
         else:
             thought_chain.append("[SENTINEL VERDICT] NOMINAL. All metrics within healthy baselines.")
 
+        if (not coverage_complete or not total_events) and verdict in ("NORMAL", "STAND_DOWN"):
+            verdict = "INSUFFICIENT_DATA"
+            verdict_badge = "INSUFFICIENT DATA"
+            severity = "INFO"
+            reason = "No complete, nonempty telemetry window is available to establish traffic health."
+            recommended_action = "RESTORE_TELEMETRY_ACCESS"
+
         # 6. Cross-reference Historical Incident KB
         recalled_incident = None
         if verdict in ("CRITICAL_ANOMALY", "DRIFT_WARNING"):
             try:
-                incidents = get_incident_memory(limit=5)
+                incidents = snapshot["incidents"] if snapshot else []
                 for inc in incidents:
                     if "TOCTOU" in inc.get("threat_type", "") or "SYBIL" in inc.get("threat_type", ""):
                         recalled_incident = {
@@ -292,10 +312,20 @@ class FinTechSentinelAgent:
 
         # Package state payload
         eval_result = {
+            "database_path": database_path,
+            "context": (snapshot["context"] if snapshot else analysis_context(
+                database_path, window_seconds, now_ms=now_ms, coverage_complete=coverage_complete,
+                analyzed_count=total_events,
+                source="SYNTHETIC_SCENARIO" if is_simulated else "UNAVAILABLE_OR_PARTIAL_BUFFER").model_dump()),
+            "assessment_state": ("INSUFFICIENT_DATA" if not coverage_complete or not total_events else
+                                 "SIGNAL_DETECTED" if verdict in ("CRITICAL_ANOMALY", "DRIFT_WARNING") else
+                                 "NO_SIGNAL_OBSERVED"),
             "epoch_ms": now_ms,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "is_simulated": is_simulated,
-            "data_source": "SYNTHETIC_SCENARIO" if is_simulated else "ACTIVE_DB",
+            "data_source": "SYNTHETIC_SCENARIO" if is_simulated else "ACTIVE_DB" if coverage_complete else "STREAM_BUFFER",
+            "coverage_complete": coverage_complete,
+            "analyzed_event_count": total_events,
             "campaign_pool_usd": CAMPAIGN_POOL_USD,
             "verdict": verdict,
             "verdict_badge": verdict_badge,
@@ -322,6 +352,8 @@ class FinTechSentinelAgent:
         }
 
         self.current_state = eval_result
+        if snapshot:
+            self._dataset_key = (snapshot['context']['dataset_id'], snapshot['context']['dataset_revision'])
         self.current_verdict = verdict
         self.evaluation_history.append({
             "time": time.strftime("%H:%M:%S"),
@@ -335,6 +367,13 @@ class FinTechSentinelAgent:
 
     def get_status(self) -> Dict[str, Any]:
         """Tra ve trang thai giam sat hien tai cua Sentinel"""
+        current = dataset_identity(self.db_path or get_active_db_path())
+        if self._dataset_key != (current.dataset_id, current.dataset_revision):
+            self.current_state = {"verdict": "INSUFFICIENT_DATA", "verdict_badge": "NOT ASSESSED",
+                                  "assessment_state": "NOT_ASSESSED", "tps": 0.0,
+                                  "reason": "Dataset changed or has not been evaluated; run Sentinel evaluation.",
+                                  "database_path": current.database_path}
+            self.evaluation_history.clear()
         return {
             "agent_name": self.agent_name,
             "agent_role": self.agent_role,

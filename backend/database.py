@@ -1,9 +1,13 @@
 from pathlib import Path
+from contextlib import closing
 import os
 import re
 import sqlite3
 import csv
+import math
 import time
+import uuid
+import hashlib
 from typing import Dict, Any, List, Tuple, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -181,8 +185,25 @@ def init_db(force_recreate: bool = False, target_db_path: Optional[str] = None) 
     conn = get_connection(dest_path)
     cur = conn.cursor()
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS telemetry (
+    _create_telemetry_table(conn, "telemetry")
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_is_attack ON telemetry(is_attack)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_attack_type ON telemetry(attack_type)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_burst ON telemetry(burst_stream_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_user ON telemetry(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_epoch ON telemetry(epoch_ms)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_endpoint_epoch ON telemetry(api_endpoint, epoch_ms)")
+
+    init_sentinel_tables(conn)
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def _create_telemetry_table(conn: sqlite3.Connection, table_name: str):
+    conn.execute(f"""
+    CREATE TABLE IF NOT EXISTS {_quote_identifier(table_name)} (
         event_id TEXT PRIMARY KEY,
         timestamp TEXT,
         epoch_ms INTEGER,
@@ -215,19 +236,7 @@ def init_db(force_recreate: bool = False, target_db_path: Optional[str] = None) 
     )
     """)
 
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_is_attack ON telemetry(is_attack)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_attack_type ON telemetry(attack_type)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_burst ON telemetry(burst_stream_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user ON telemetry(user_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_epoch ON telemetry(epoch_ms)")
-
-    init_sentinel_tables(conn)
-
-    conn.commit()
-    conn.close()
-    return True
-
-def init_sentinel_tables(conn: Optional[sqlite3.Connection] = None) -> bool:
+def init_sentinel_tables(conn: Optional[sqlite3.Connection] = None, commit: bool = True) -> bool:
     """Khoi tao cac bang Incident Memory va Policy Rules cho FinTech Sentinel va Knowledge Base"""
     should_close = False
     if conn is None:
@@ -365,15 +374,16 @@ def init_sentinel_tables(conn: Optional[sqlite3.Connection] = None) -> bool:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, seed_policies)
 
-    conn.commit()
+    if commit:
+        conn.commit()
     if should_close:
         conn.close()
     return True
 
-def get_incident_memory(limit: int = 50) -> List[Dict[str, Any]]:
+def get_incident_memory(limit: int = 50, custom_path: Optional[str] = None) -> List[Dict[str, Any]]:
     """Lay danh sach ho so su co va ban va trong qua khu tu Incident Memory KB"""
     try:
-        conn = get_connection()
+        conn = get_connection(custom_path, read_only=True)
         cur = conn.cursor()
         cur.execute("SELECT * FROM incident_memory ORDER BY epoch_ms DESC LIMIT ?", (limit,))
         rows = [dict(r) for r in cur.fetchall()]
@@ -381,20 +391,24 @@ def get_incident_memory(limit: int = 50) -> List[Dict[str, Any]]:
         return rows
     except Exception:
         return []
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
-def add_incident_memory(incident: Dict[str, Any]) -> bool:
+def add_incident_memory(incident: Dict[str, Any], custom_path: Optional[str] = None) -> bool:
     """Them ho so su co moi vao Incident Memory KB"""
+    conn = None
     try:
-        conn = get_connection()
+        conn = get_connection(custom_path) if custom_path else get_connection()
         cur = conn.cursor()
         now_ms = int(time.time() * 1000)
         cur.execute("""
-        INSERT OR REPLACE INTO incident_memory (
+        INSERT INTO incident_memory (
             incident_id, epoch_ms, timestamp, threat_type, target_endpoint,
             severity, velocity_tps, financial_loss, rca_summary, remediation_patch, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            incident.get("incident_id") or f"INC-{int(time.time())}",
+            incident.get("incident_id") or f"INC-{uuid.uuid4().hex}",
             incident.get("epoch_ms") or now_ms,
             incident.get("timestamp") or time.strftime("%Y-%m-%d %H:%M:%S"),
             incident.get("threat_type", "UNKNOWN_THREAT"),
@@ -407,15 +421,17 @@ def add_incident_memory(incident: Dict[str, Any]) -> bool:
             incident.get("status", "RESOLVED")
         ))
         conn.commit()
-        conn.close()
         return True
     except Exception:
         return False
+    finally:
+        if conn is not None:
+            conn.close()
 
-def get_policy_rules() -> List[Dict[str, Any]]:
+def get_policy_rules(custom_path: Optional[str] = None) -> List[Dict[str, Any]]:
     """Lay danh sach quy tac nghiep vu va cua so khuyen mai cua Sentinel"""
     try:
-        conn = get_connection()
+        conn = get_connection(custom_path, read_only=True)
         cur = conn.cursor()
         cur.execute("SELECT * FROM policy_rules ORDER BY rule_id ASC")
         rows = [dict(r) for r in cur.fetchall()]
@@ -423,6 +439,9 @@ def get_policy_rules() -> List[Dict[str, Any]]:
         return rows
     except Exception:
         return []
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def toggle_policy_rule(rule_id: str, is_active: int) -> bool:
     """Bat/tat mot quy tac Sentinel"""
@@ -461,7 +480,7 @@ def import_custom_csv_to_db(csv_file_path: str, table_name: str = "telemetry", t
     t0 = time.time()
     os.makedirs(os.path.dirname(dest_db), exist_ok=True)
 
-    with open(csv_file_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(csv_file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
         reader = csv.reader(f)
         try:
             header = next(reader)
@@ -472,36 +491,58 @@ def import_custom_csv_to_db(csv_file_path: str, table_name: str = "telemetry", t
         return {"success": False, "error": "CSV header is empty or has too many columns."}
 
     col_count = len(header)
-    is_standard_telemetry = (col_count == 29 and "event_id" in header and safe_table == "telemetry")
+    header = [col.strip() for col in header]
+    if len(set(header)) != col_count:
+        return {"success": False, "error": "CSV column names must be unique."}
+    # Derive the canonical schema from the same definition used at startup.
+    with closing(sqlite3.connect(":memory:")) as schema_conn:
+        _create_telemetry_table(schema_conn, "telemetry")
+        telemetry_types = {r[1]: r[2] for r in schema_conn.execute("PRAGMA table_info(telemetry)")}
+    is_standard_telemetry = safe_table == "telemetry" and set(header) == set(telemetry_types)
+    if safe_table == "telemetry" and col_count == len(telemetry_types) and "event_id" in header and not is_standard_telemetry:
+        return {"success": False, "error": "Telemetry CSV header does not match the required schema."}
 
     conn = None
     try:
         conn = sqlite3.connect(dest_db)
         cur = conn.cursor()
-        cur.execute("PRAGMA synchronous = OFF")
-        cur.execute("PRAGMA journal_mode = MEMORY")
+        cur.execute("BEGIN IMMEDIATE")
+        staging_table = "_aigis_import_" + uuid.uuid4().hex
 
         if is_standard_telemetry:
-            cur.execute("DROP TABLE IF EXISTS telemetry")
-            init_db(force_recreate=False, target_db_path=dest_db)
+            _create_telemetry_table(conn, staging_table)
+            safe_cols = header
             insert_table = "telemetry"
         else:
             # Tạo bảng động cho file CSV tùy chỉnh
             safe_cols = [re_sub(col.strip())[:64] or f"col_{idx}" for idx, col in enumerate(header)]
             col_defs = ", ".join([f'{_quote_identifier(c)} TEXT' for c in safe_cols])
-            cur.execute(f'DROP TABLE IF EXISTS {_quote_identifier(safe_table)}')
-            cur.execute(f'CREATE TABLE {_quote_identifier(safe_table)} ({col_defs})')
+            cur.execute(f'CREATE TABLE {_quote_identifier(staging_table)} ({col_defs})')
             insert_table = safe_table
 
         placeholders = ",".join(["?"] * col_count)
-        insert_sql = f'INSERT INTO {_quote_identifier(insert_table)} VALUES ({placeholders})'
+        column_list = ",".join(_quote_identifier(col) for col in safe_cols)
+        insert_sql = f'INSERT INTO {_quote_identifier(staging_table)} ({column_list}) VALUES ({placeholders})'
 
         total_imported = 0
-        with open(csv_file_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(csv_file_path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
             reader = csv.reader(f)
             next(reader)  # skip header
             batch = []
             for row in reader:
+                if len(row) != col_count:
+                    raise ValueError("CSV row length does not match its header")
+                if is_standard_telemetry:
+                    row = [None if value == "" and telemetry_types[col] in ("INTEGER", "REAL") else value
+                           for col, value in zip(header, row)]
+                    for col, value in zip(header, row):
+                        if col == "event_id" and not value:
+                            raise ValueError("Missing event_id")
+                        if value is not None and telemetry_types[col] == "INTEGER":
+                            int(value)
+                        elif value is not None and telemetry_types[col] == "REAL":
+                            if not math.isfinite(float(value)):
+                                raise ValueError("Non-finite telemetry value")
                 if len(row) == col_count:
                     batch.append(row)
                     if len(batch) >= chunk_size:
@@ -514,12 +555,16 @@ def import_custom_csv_to_db(csv_file_path: str, table_name: str = "telemetry", t
                 total_imported += len(batch)
                 batch.clear()
 
+        cur.execute(f'DROP TABLE IF EXISTS {_quote_identifier(insert_table)}')
+        cur.execute(f'ALTER TABLE {_quote_identifier(staging_table)} RENAME TO {_quote_identifier(insert_table)}')
         if is_standard_telemetry:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_is_attack ON telemetry(is_attack)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_attack_type ON telemetry(attack_type)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_burst ON telemetry(burst_stream_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_user ON telemetry(user_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_epoch ON telemetry(epoch_ms)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_endpoint_epoch ON telemetry(api_endpoint, epoch_ms)")
+            init_sentinel_tables(conn, commit=False)
 
         conn.commit()
 
@@ -540,6 +585,8 @@ def import_custom_csv_to_db(csv_file_path: str, table_name: str = "telemetry", t
             "db_name": ACTIVE_DB_NAME
         }
     except Exception:
+        if conn is not None:
+            conn.rollback()
         return {"success": False, "error": "Failed to import CSV into SQLite."}
     finally:
         if conn is not None:
@@ -1133,6 +1180,7 @@ def get_database_model_graph() -> Dict[str, Any]:
             "total_relationships": len(active_relationships),
             "architecture": "FinTech Star-Snowflake Data Model",
             "active_database": ACTIVE_DB_NAME,
+            "model_dataset_id": hashlib.sha256(os.path.normcase(os.path.realpath(ACTIVE_DB_PATH)).encode()).hexdigest()[:24],
             "tables": table_nodes,
             "relationships": active_relationships
         }

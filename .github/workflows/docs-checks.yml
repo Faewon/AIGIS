@@ -14,4 +14,5 @@ jobs:
         with:
           node-version: '22'
       - run: python -m scratch.check_docs
+      - run: node scratch/check_model_layout.cjs
       - run: npx --yes markdownlint-cli2@0.17.2

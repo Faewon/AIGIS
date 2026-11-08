@@ -2,6 +2,8 @@ import asyncio
 import time
 from typing import Dict, Any, List
 from ..mock_target.store import mock_store
+from backend.simulation import current_run
+from backend.evidence import SimulationEvidence, ScenarioMeasurement
 
 class SandboxRunnerAgent:
     """
@@ -215,10 +217,21 @@ class SandboxRunnerAgent:
     async def execute_scenario(self, scenario: str, burst_count: int = 15) -> Dict[str, Any]:
         """Router điều phối kịch bản tấn công"""
         if scenario == "BOLA_IDOR":
-            return await self.execute_bola_attack()
+            report = await self.execute_bola_attack()
         elif scenario == "NEGATIVE_AMOUNT_TAMPERING":
-            return await self.execute_tamper_attack()
+            report = await self.execute_tamper_attack()
         elif scenario == "STEP_SKIPPING_STATE_BYPASS":
-            return await self.execute_step_skipping_attack()
+            report = await self.execute_step_skipping_attack()
         else:
-            return await self.execute_burst_attack(burst_count=burst_count)
+            report = await self.execute_burst_attack(burst_count=burst_count)
+        context = current_run()
+        if context:
+            report["evidence"] = SimulationEvidence(
+                run_id=context["run_id"], seed=context["seed"], scenario=report["scenario"],
+                workload_id=f"{report['scenario']}:{report['total_requests']}",
+                phase="retest" if mock_store.patch_enabled else "attack",
+                controls={"patch_enabled": mock_store.patch_enabled, **mock_store.patch_modules}).model_dump()
+        report["assessment_state"] = ("EXPLOIT_REPRODUCED_IN_MOCK" if report["is_vulnerable"] else
+                                      "MITIGATION_VERIFIED_IN_MOCK" if report["status"] == "EXPLOIT_NEUTRALIZED" else
+                                      "VERIFICATION_FAILED")
+        return ScenarioMeasurement.model_validate(report).model_dump(exclude_none=True)

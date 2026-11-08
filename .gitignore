@@ -24,7 +24,9 @@ backend/datasets/*.csv
 *.csv
 
 # Scratch and Temporary files
-scratch/
+scratch/*
+!scratch/check_project.py
+!scratch/check_browser.py
 *.bak
 scratch_classes.txt
 apply_sidebar_update.py
@@ -35,3 +37,6 @@ inspect_spacing.py
 Thumbs.db
 .vscode/
 .idea/
+
+# Agent temporary artifacts
+brain/

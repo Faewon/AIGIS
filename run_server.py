@@ -3,16 +3,12 @@ AIGIS Wargame Engine — Launcher Script
 Chạy máy chủ Wargame và mở trình duyệt tự động
 """
 import os
-import sys
 from pathlib import Path
 import webbrowser
 import threading
 import time
 
-# Đảm bảo đường dẫn thư mục gốc luôn nằm trong sys.path
 ROOT_DIR = Path(__file__).resolve().parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
 os.chdir(ROOT_DIR)
 
 import uvicorn

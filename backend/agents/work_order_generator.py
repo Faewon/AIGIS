@@ -8,15 +8,10 @@ Directly adapted from ARIA's Work Order Generator Architecture:
 """
 
 import time
+import uuid
 from typing import Dict, Any, List, Optional
 
-try:
-    from .quant_investigator import global_quant_investigator
-except (ImportError, ModuleNotFoundError):
-    try:
-        from quant_investigator import global_quant_investigator
-    except (ImportError, ModuleNotFoundError):
-        from backend.agents.quant_investigator import global_quant_investigator
+from backend.agents.quant_investigator import global_quant_investigator
 
 
 class SecOpsWorkOrderGenerator:
@@ -34,7 +29,7 @@ class SecOpsWorkOrderGenerator:
         """Tong hop phieu can thiep ky thuat SecOps Work Order tu ket qua RCA"""
         import re
         now = time.time()
-        ticket_id = f"WO-2026-{int(now) % 10000:04d}"
+        ticket_id = f"WO-{uuid.uuid4().hex}"
 
         if not re.fullmatch(r"/[A-Za-z0-9_./:-]{1,120}", target_endpoint or ""):
             target_endpoint = "/api/v1/voucher/claim"
@@ -42,6 +37,12 @@ class SecOpsWorkOrderGenerator:
             threat_type = "TOCTOU_RACE_CONDITION"
 
         report = inv_report or global_quant_investigator.latest_report or {}
+        from backend.evidence import dataset_identity
+        from backend.database import get_active_db_path
+        context = report.get("context")
+        if (report.get("target_endpoint") != target_endpoint or
+            context and context.get("dataset_revision") != dataset_identity(get_active_db_path()).dataset_revision):
+            report = {}
         rca = report.get("root_cause_analysis", {}) or {}
         qm = report.get("quantitative_metrics", {}) or {}
 
@@ -52,6 +53,8 @@ class SecOpsWorkOrderGenerator:
 
         ticket = {
             "ticket_id": ticket_id,
+            "context": report.get("context"),
+            "assessment_state": report.get("assessment_state", "NOT_ASSESSED"),
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "status": "DRAFT_PENDING_APPROVAL",
             "priority": "P0_CRITICAL" if stolen else "UNASSESSED",

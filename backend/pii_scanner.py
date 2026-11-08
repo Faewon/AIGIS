@@ -31,6 +31,7 @@ class SensitiveDataScanner:
         "CREDIT_CARD_PAN": r'(?<![\d-])\d(?:[ -]?\d){12,18}(?![\d-])',
         # Vietnam CCCD: 12 digits starting with a 3-digit province code (001-096).
         "VIETNAM_CCCD_ID": r'(?<!\d)0(?:0[1-9]|[1-8]\d|9[0-6])\d{9}(?!\d)',
+        "VIETNAM_CMND_ID": r'(?<!\d)\d{9}(?!\d)',
         "JWT_SECRET_TOKEN": r'\beyJ[a-zA-Z0-9_\-]{15,}\.[a-zA-Z0-9_\-]{15,}\.[a-zA-Z0-9_\-]{15,}\b',
         "API_SECRET_KEY": r'\b(?:sk_live_[a-zA-Z0-9]{24,}|sk-[A-Za-z0-9_\-]{20,}|AIza[0-9A-Za-z_\-]{35}|ghp_[a-zA-Z0-9]{36}|gsk_[A-Za-z0-9]{20,})\b',
         "PHONE_NUMBER_VN": r'\b(?:09|08|03|07|05)[0-9]{8}\b'
@@ -60,7 +61,7 @@ class SensitiveDataScanner:
                 })
 
         # 2. National ID (CCCD) Check
-        for m in re.finditer(cls.PATTERNS["VIETNAM_CCCD_ID"], content):
+        for m in re.finditer(cls.PATTERNS["VIETNAM_CCCD_ID"] + "|" + cls.PATTERNS["VIETNAM_CMND_ID"], content):
             cid = m.group(0)
             masked = f"{cid[:3]}XXXXXX{cid[-3:]}"
             masked_content = masked_content.replace(cid, masked)

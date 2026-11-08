@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
     <title>AIGIS - Autonomous Business Logic Vulnerability Proving Ground</title>
 
     
@@ -471,10 +472,89 @@ pre.bg-gray-950 code {
     display: none !important;
 }
 
+@media (max-width: 640px) {
+    html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+    .pbi-ribbon { max-width: 100vw; }
+    [id^="pbi-page-"] { min-width: 0; max-width: 100%; }
+    .modal-backdrop-aigis { padding: 0.75rem !important; }
+    .modal-backdrop-aigis > div { min-width: 0; max-width: 100%; }
+    .sp-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}
+
 .modal-container-scroll {
     max-height: 88vh !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+}
+
+/* Keyboard focus and non-blocking feedback. */
+:focus-visible { outline: 3px solid #2563eb !important; outline-offset: 3px; }
+button:disabled { cursor: wait; opacity: .6; }
+#aigis-notifications { position: fixed; bottom: 20px; right: 20px; z-index: 12000; display: grid; gap: 8px; width: min(420px, calc(100vw - 32px)); }
+.aigis-toast { display: flex; align-items: start; gap: 12px; padding: 14px; background: white; color: #334155; border: 1px solid #cbd5e1; border-left: 4px solid #107c41; box-shadow: 0 6px 24px #0002; font-size: 13px; overflow-wrap: anywhere; }
+.aigis-toast-error { border-left-color: #be123c; }
+.aigis-toast button, .aigis-retry { color: #107c41; font-weight: 600; padding: 4px 8px; }
+.aigis-toast span { flex: 1; }
+.modal-container-scroll { overscroll-behavior: contain; }
+.model-table-header { cursor: grab; touch-action: none; }
+.model-table-header:active { cursor: grabbing; }
+.model-toolbar, .model-bottom-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 12px; background: white; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+.model-toolbar strong { margin-right: 12px; }
+.model-toolbar button, .model-bottom-bar button, #model-properties button { padding: 6px 9px; border-radius: 3px; color: #334155; font-size: 12px; }
+.model-toolbar button:hover, .model-bottom-bar button:hover, #model-properties button:hover { background: #f1f5f9; }
+.model-counts { margin-left: auto; color: #64748b; font-size: 11px; }
+.model-workspace { display: flex; min-height: 0; min-width: 0; overflow: hidden; position: relative; isolation: isolate; }
+#cell0-model-view { min-width: 0; width: 100%; overflow: hidden; isolation: isolate; }
+#model-canvas-wrapper { flex: 1; min-width: 0; height: 580px; overflow: auto; position: relative; isolation: isolate; background: #f7f8fa; overscroll-behavior: contain; }
+#model-canvas-surface { position: relative; flex: none; }
+#model-zoom-container { position: absolute; left: 0; top: 0; transform-origin: 0 0; transition: none; }
+#model-svg-layer, #model-nodes-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+.model-toolbar, .model-bottom-bar, .model-hint { position: relative; z-index: 1; flex-shrink: 0; }
+#model-properties { position: relative; z-index: 1; min-width: 0; }
+.model-table-header { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#model-properties { width: 260px; flex-shrink: 0; border-left: 1px solid #e2e8f0; background: white; max-height: 580px; overflow-y: auto; font-size: 12px; }
+.model-pane-heading { padding: 12px 14px; font-weight: 600; border-bottom: 1px solid #f1f5f9; }
+#model-properties-content, .model-table-summary { padding: 14px; overflow-wrap: anywhere; }
+.model-table-summary { border-top: 1px solid #e2e8f0; line-height: 1.8; }
+.model-muted, .model-table-summary p { color: #64748b; }
+.model-property { margin-bottom: 14px; }
+.model-property dt { color: #64748b; margin-bottom: 4px; font-size: 11px; }
+.model-property dd { color: #1e293b; }
+.model-bottom-bar { border-top: 1px solid #e2e8f0; border-bottom: none; }
+#model-layout-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+#model-layout-tabs button[aria-pressed="true"] { color: #107c41; background: #edf7f1; box-shadow: inset 0 -2px #107c41; }
+.model-zoom-tools { display: flex; align-items: center; margin-left: auto; }
+.model-hint { padding: 7px 12px; font-size: 11px; color: #64748b; background: #fafafa; border-top: 1px solid #f1f5f9; }
+#model-layout-tables label { display: flex; align-items: center; gap: 8px; padding: 6px 14px; overflow-wrap: anywhere; }
+#model-nodes-container > .model-card { background: white; border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; }
+#model-nodes-container > .model-card.is-selected { border-color: #107c41; box-shadow: 0 0 0 1px #107c41; }
+.model-table-header { padding: 10px 12px; font-size: 12px; font-weight: 600; background: #fff; border-bottom: 1px solid #e5e7eb; }
+.model-column { color: #475569; }
+.model-column small, .model-column .model-key { display: none; }
+.model-column:hover small { display: inline; }
+@media (max-width: 900px) { #model-properties { width: 220px; } }
+@media (max-width: 640px) { .model-workspace { flex-direction: column; } #model-properties { width: 100%; max-height: 280px; border-left: 0; border-top: 1px solid #e2e8f0; } #model-canvas-wrapper { flex: auto; height: 440px; } }
+.model-column { display: flex; justify-content: space-between; width: 100%; padding: 5px 8px; font-size: 11px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+.model-column:hover, .model-column.is-source { background: #dcfce7; color: #166534; }
+.model-column small { color: #64748b; padding-left: 8px; }
+.model-fields { max-height: 200px; overflow-y: auto; }
+#model-nodes-container { pointer-events: none; }
+#model-nodes-container > div { pointer-events: auto; }
+.model-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.model-form label { display: grid; gap: 6px; font-size: 12px; }
+.model-form select { padding: 8px; border: 1px solid #cbd5e1; max-width: 100%; }
+#model-relationship-list { display: grid; gap: 8px; max-height: 220px; overflow: auto; }
+.model-relation-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #e2e8f0; padding: 8px; font-size: 12px; }
+@media (max-width: 640px) { .model-form { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+    .modal-backdrop-aigis .flex.items-center.justify-between { flex-wrap: wrap; gap: 12px; }
+    .modal-backdrop-aigis .flex.items-center.space-x-2 { flex-wrap: wrap; gap: 8px; }
+    .modal-backdrop-aigis button { min-height: 36px; }
+    .modal-backdrop-aigis pre { max-width: 100%; overflow-x: auto; }
+    .pbi-ribbon { overflow-x: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
 /* Sizing utility classes */
@@ -1133,7 +1213,7 @@ pre.bg-gray-950 code {
         <!-- Center: Quick Search Bar -->
         <div class="hidden md:flex items-center w-72 rounded px-2.5 py-1 text-slate-300 text-xs border border-slate-700 focus-within:border-slate-500" style="background-color: #2b2b2b !important; color: #ffffff !important;">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5 text-slate-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" placeholder="Search tables, columns, metrics..." class="bg-transparent border-none text-[11px] text-white focus:outline-none w-full placeholder-slate-500" onkeyup="if(event.key==='Enter') searchDataViewTable()">
+            <input type="text" aria-label="Search table rows" placeholder="Search table rows..." class="bg-transparent border-none text-[11px] text-white focus:outline-none w-full placeholder-slate-500" onkeyup="if(event.key==='Enter') { document.getElementById('data-view-search-input').value = this.value; switchPowerBiView('data'); searchDataViewTable(); }">
         </div>
 
         <!-- Right: Status, Rounds & Actions -->
@@ -1171,7 +1251,7 @@ pre.bg-gray-950 code {
         <!-- ========================================================================= -->
     <!-- 2. POWER BI FLUENT RIBBON BAR (LIGHT GRAY #f3f2f1)                        -->
     <!-- ========================================================================= -->
-    <header class="pbi-ribbon select-none sticky top-9 z-40 text-xs font-mono" style="background-color: #f3f2f1 !important; border-bottom: 1px solid #e1dfdd !important;">
+    <header data-dashboard-controls="ribbon" class="pbi-ribbon select-none sticky top-9 z-40 text-xs font-mono" style="background-color: #f3f2f1 !important; border-bottom: 1px solid #e1dfdd !important;">
         <!-- Ribbon Action Toolbar (Integrated with Data Ops, No Duplicate Page Tabs) -->
         <div class="px-4 py-1.5 flex items-center justify-between overflow-x-auto text-xs">
             <!-- Left Action Groups: Analysis & Security (Pure Text, Zero Icon) -->
@@ -1235,6 +1315,7 @@ pre.bg-gray-950 code {
                                 <span class="font-bold text-gray-400">[6]</span>
                                 <div><div class="font-bold text-gray-900">Manage Uploaded Datasets</div><div class="text-[10px] text-gray-500">View and purge datasets</div></div>
                             </button>
+                            <div id="dropdown-status-text" role="status" class="px-3 py-1.5 text-[10px] text-gray-500">Choose a dataset to connect.</div>
                         </div>
                     </div>
                 </div>
@@ -1530,7 +1611,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         <div class="flex items-center space-x-2">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
                             <span class="font-bold text-slate-800 text-xs tracking-wide">Data</span>
-                            <span class="text-[10px] text-slate-500 font-semibold">(20 tables)</span>
+                            <span id="data-pane-table-total" class="text-[10px] text-slate-500 font-semibold"></span>
                         </div>
                         <span class="text-[10px] bg-white border border-[#d2d0ce] text-slate-700 font-bold px-1.5 py-0.5 rounded shadow-2xs" id="data-pane-tables-count">20 TABLES</span>
                     </div>
@@ -1559,55 +1640,27 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <!-- POWER BI VIEW 2: MODEL VIEW (SCHEMA RELATIONSHIP DIAGRAM)     -->
                 <!-- ============================================================= -->
                 <div id="cell0-model-view" class="border border-slate-200 rounded-lg bg-white overflow-hidden shadow-sm flex flex-col">
-                    <!-- Model View Top Toolbar -->
-                    <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 rounded-md bg-[#e6f1fa] text-[#155e96] flex items-center justify-center font-bold text-base shadow-sm">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                            </div>
-                            <div>
-                                <div class="flex items-center space-x-2">
-                                    <h3 class="font-bold text-sm text-slate-900">Power BI Relational Model View</h3>
-                                    <span class="sp-pill sp-p-ok text-[10px]">STAR-SNOWFLAKE SCHEMA</span>
-                                </div>
-                                <p class="text-xs text-slate-500 mt-0.5">Interactive entity-relationship graph connecting 20 tables via foreign key constraints.</p>
-                            </div>
-                        </div>
-
-                        <!-- Model Metrics & Controls -->
-                        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
-                            <div class="flex items-center space-x-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded text-slate-600 font-semibold shadow-2xs">
-                                <span>Tables: <strong class="text-slate-900" id="model-count-tables">20</strong></span>
-                                <span class="text-slate-300">•</span>
-                                <span>Relations: <strong class="text-[#155e96]" id="model-count-relations">22</strong></span>
-                                <span class="text-slate-300">•</span>
-                                <span>Cardinality: <strong class="text-emerald-700">1 : *</strong></span>
-                            </div>
-
-                            <!-- Filter by Category -->
-                            <div class="inline-flex sp-segc items-center">
-                                <button onclick="filterModelCategory('all')" id="btn-model-cat-all" class="on">All (20)</button>
-                                <button onclick="filterModelCategory('FACT')" id="btn-model-cat-facts">Facts (6)</button>
-                                <button onclick="filterModelCategory('DIMENSION')" id="btn-model-cat-dims">Dims (14)</button>
-                            </div>
-
-                            <!-- Zoom Tools -->
-                            <div class="flex items-center space-x-1">
-                                <button onclick="zoomModelCanvas(0.1)" class="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 font-bold" title="Zoom In">+</button>
-                                <button onclick="zoomModelCanvas(-0.1)" class="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 font-bold" title="Zoom Out">-</button>
-                                <button onclick="resetModelCanvas()" class="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 font-bold" title="Reset View">100%</button>
-                            </div>
-                        </div>
+                    <div class="model-toolbar">
+                        <strong>Model</strong>
+                        <button onclick="openModelRelationshipEditor()">New relationship</button>
+                        <button onclick="openModelRelationshipManager()">Manage relationships</button>
+                        <button onclick="showRelatedModelTables()">Show related</button>
+                        <button id="model-arrange-button" onclick="autoArrangeModel()">Auto arrange</button>
+                        <button id="model-undo-button" onclick="undoModelArrange()" disabled>Undo arrange</button>
+                        <button onclick="toggleModelProperties()" aria-controls="model-properties">Properties</button>
+                        <span class="model-counts"><span id="model-count-tables">0</span> tables · <span id="model-count-relations">0</span> relationships</span>
                     </div>
+                    <div class="model-workspace">
 
                     <!-- Canvas Wrapper: Scrollable, Grid Background with SVG lines -->
-                    <div class="relative w-full overflow-auto bg-[#f8fafc] min-h-[580px] max-h-[640px]" id="model-canvas-wrapper" style="background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px); background-size: 20px 20px;">
+                    <div class="relative overflow-auto" id="model-canvas-wrapper">
                         
+                        <div id="model-canvas-surface">
                         <!-- Transform Container for Zoom/Pan -->
                         <div id="model-zoom-container" class="relative w-[1950px] h-[1150px] transition-transform duration-150 origin-top-left">
                             
                             <!-- SVG Connector Layer for Foreign Key Relationships -->
-                            <svg id="model-svg-layer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 10;">
+                            <svg id="model-svg-layer" class="absolute inset-0 w-full h-full" style="z-index: 10; pointer-events: none;">
                                 <defs>
                                     <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                                         <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
@@ -1625,21 +1678,30 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                             </div>
                         </div>
                     </div>
-
-                    <!-- Inspector Drawer: Shows details of selected table or relationship -->
-                    <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-2 text-xs font-mono" id="model-inspector-bar">
-                        <div class="flex items-center space-x-2 truncate">
-                            <span class="text-slate-400">Selected Entity:</span>
-                            <strong class="text-slate-900" id="model-selected-entity-name">telemetry (Fact Table)</strong>
-                            <span class="text-slate-400">•</span>
-                            <span class="text-slate-600" id="model-selected-entity-details">29 Columns • 1,000,000 rows • Linked to 7 Dimensions</span>
+                    </div>
+                    <aside id="model-properties" aria-label="Model properties">
+                        <div class="model-pane-heading">Properties</div>
+                        <div id="model-properties-content"><p class="model-muted">Select a table or relationship to inspect its properties.</p></div>
+                        <div id="model-inspector-bar" class="model-table-summary">
+                            <strong id="model-selected-entity-name">No table selected</strong>
+                            <p id="model-selected-entity-details"></p>
+                            <button onclick="jumpToDataViewFromModel()">Open in Data View →</button>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <button onclick="jumpToDataViewFromModel()" class="sp-btn sp-btn-p sp-btn-sm font-semibold text-xs">
-                                <span>Open in Data View &rarr;</span>
-                            </button>
+                        <div class="model-pane-heading">Tables in layout</div>
+                        <div id="model-layout-tables"></div>
+                    </aside>
+                    </div>
+                    <div class="model-bottom-bar">
+                        <div id="model-layout-tabs" role="group" aria-label="Model layouts"></div>
+                        <button onclick="createModelLayout()" aria-label="Create layout">+ New layout</button>
+                        <div class="model-zoom-tools">
+                            <button onclick="fitModelToView()">Fit to view</button>
+                            <button onclick="zoomModelCanvas(-0.1)" aria-label="Zoom out">−</button>
+                            <button id="model-zoom-label" onclick="resetModelCanvas()">100%</button>
+                            <button onclick="zoomModelCanvas(0.1)" aria-label="Zoom in">+</button>
                         </div>
                     </div>
+                    <div class="model-hint" role="status" id="model-hint">Drag headers to arrange tables. Connect two columns to create a relationship. Double-click a line to edit.</div>
                 </div>
             </div>
 
@@ -2433,7 +2495,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
             <!-- ================================================================= -->
 
                 <!-- Cell 0: Telemetry Explorer & Forensics Ingest -->
-                <section id="cell-0"  class="kernel-cell p-5 space-y-3.5">
+                <section data-dashboard-controls="explorer" id="cell-0"  class="kernel-cell p-5 space-y-3.5">
                 <!-- Cell Header -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-2.5 border-b border-gray-200 gap-2">
                     <div class="flex items-center space-x-2.5">
@@ -2562,7 +2624,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <!-- 4-Card Precision Telemetry Distribution Strip -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
                     <div class="bg-gray-50 border border-gray-200 px-3 py-2">
-                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total Records</div>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Events streamed this session</div>
                         <div class="text-sm font-bold text-gray-900 mt-0.5" id="ds-total-rows">1,000,000</div>
                     </div>
                     <div class="bg-gray-50 border border-gray-200 px-3 py-2">
@@ -3093,7 +3155,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                             [TEST API KEY]
                         </button>
                     </div>
-                    <input type="password" id="config-api-key" placeholder="Enter API key for the selected provider" class="w-full p-2 bg-white border border-gray-300 focus:border-black focus:outline-none text-xs">
+                    <input type="password" id="config-api-key" autocomplete="off" aria-label="Provider API key" placeholder="Enter API key for the selected provider" class="w-full p-2 bg-white border border-gray-300 focus:border-black focus:outline-none text-xs">
                     <div id="key-test-feedback" class="hidden text-[10px] mt-1 font-mono"></div>
                 </div>
 
@@ -3118,7 +3180,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
         <div class="bg-white border border-gray-300 max-w-3xl w-full p-6 space-y-4 shadow-2xl font-mono text-xs modal-container-scroll my-4" style="max-height: 88vh; overflow-y: auto;">
             <div class="flex items-center justify-between pb-2 border-b border-gray-200">
                 <div>
-                    <h3 class="text-base font-bold text-gray-900">Pull Request #142 Handover</h3>
+                    <h3 class="text-base font-bold text-gray-900">Simulated Pull Request Draft</h3>
                     <p class="text-[11px] text-gray-500">Autonomous Security Patch Generated by Aegis CRS</p>
                 </div>
                 <button onclick="closePRModal()" class="text-gray-400 hover:text-black font-bold p-1 cursor-pointer">
@@ -3150,7 +3212,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <span class="text-[11px] text-gray-500">Target: main repository</span>
                 <div class="flex space-x-2">
                     <button onclick="closePRModal()" class="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 font-bold cursor-pointer">Cancel</button>
-                    <button onclick="triggerPRCreatedAlert()" class="px-4 py-1.5 bg-black hover:bg-gray-800 text-white font-bold cursor-pointer border border-black">Merge Pull Request</button>
+                    <button onclick="triggerPRCreatedAlert()" class="px-4 py-1.5 bg-black hover:bg-gray-800 text-white font-bold cursor-pointer border border-black">Close Draft Preview</button>
                 </div>
             </div>
         </div>
@@ -3602,7 +3664,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         <span>Deep Quant Investigator &amp; Python Sandbox RCA</span>
                         <span class="px-2 py-0.5 bg-rose-100 text-rose-800 font-bold text-[10px]">ARIA EXTENDED REASONING + SANDBOX</span>
                     </h3>
-                    <p class="text-[11px] text-gray-500">Autonomous Python Code Synthesis &bull; Isolated Subprocess Sandbox &bull; Sub-Millisecond TOCTOU Window Analysis</p>
+                    <p class="text-[11px] text-gray-500">Read-only SQL analysis &bull; Audit code preview &bull; Telemetry timing signals</p>
                 </div>
                 <button onclick="closeQuantInvestigatorModal()" class="text-gray-400 hover:text-gray-900 font-bold text-base px-2 py-1 cursor-pointer">[X]</button>
             </div>
@@ -3640,7 +3702,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <div class="p-2.5 bg-slate-50 border border-slate-200 rounded">
                     <div class="text-[10px] text-slate-500 uppercase font-bold">Sandbox Execution</div>
                     <div class="text-lg font-bold text-emerald-700" id="investigator-kpi-duration">146.9 <span class="text-xs font-normal text-slate-500">ms</span></div>
-                    <div class="text-[10px] text-slate-500 mt-0.5 font-mono">Subprocess Exit: 0</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5 font-mono">Analysis execution status</div>
                 </div>
             </div>
 
@@ -3663,7 +3725,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
 
                 <!-- Tab 2: Terminal Output -->
                 <div id="investigator-pane-terminal" class="hidden space-y-1">
-                    <div class="text-[11px] text-gray-500">Isolated Subprocess stdout and execution telemetry:</div>
+                    <div class="text-[11px] text-gray-500">Read-only SQL analysis results and telemetry:</div>
                     <pre id="investigator-terminal-view" class="p-3 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded max-h-56 overflow-y-auto border border-slate-800 leading-relaxed whitespace-pre"></pre>
                 </div>
 
@@ -3678,11 +3740,11 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
             <div class="flex items-center justify-between pt-3 border-t border-gray-200 text-[11px]">
                 <div class="text-gray-500 flex items-center space-x-1.5">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Read-Only Sandbox Subprocess &bull; 5.0s Timeout Enforced</span>
+                    <span>Read-only SQL analysis &bull; Audit code preview is not executed</span>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button onclick="openSecOpsWorkOrderModal()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded cursor-pointer transition">Generate Work Order</button>
-                    <button onclick="runInvestigatorLiveDiagnosis()" id="btn-run-investigator-diagnosis" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded cursor-pointer transition">Run Sandbox Python RCA</button>
+                    <button onclick="runInvestigatorLiveDiagnosis()" id="btn-run-investigator-diagnosis" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded cursor-pointer transition">Run Read-Only Analysis</button>
                     <button onclick="handoffToBlueTeamFromInvestigator()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded cursor-pointer transition">Send to Blue Team Aegis</button>
                     <button onclick="closeQuantInvestigatorModal()" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded cursor-pointer transition">Close</button>
                 </div>
@@ -3706,13 +3768,15 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <button onclick="closeSecOpsWorkOrderModal()" class="text-gray-400 hover:text-gray-900 font-bold text-base px-2 py-1 cursor-pointer">[X]</button>
             </div>
 
+            <div id="wo-request-status" role="status" class="p-3 bg-slate-50 border border-slate-200 text-sm">Open a draft to load current findings.</div>
+
             <!-- Ticket Header Badge -->
             <div class="p-3 bg-amber-50 border border-amber-300 rounded space-y-2">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">
-                        <span class="font-bold text-sm text-amber-950 font-sans" id="wo-ticket-id">WO-2026-0814</span>
-                        <span class="px-2 py-0.5 bg-red-100 text-red-800 font-bold text-[10px] rounded">P0_CRITICAL</span>
-                        <span id="wo-status-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded">READY_FOR_CANARY</span>
+                        <span class="font-bold text-sm text-amber-950 font-sans" id="wo-ticket-id">—</span>
+                        <span id="wo-priority" class="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded">UNASSESSED</span>
+                        <span id="wo-status-badge" class="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded">NOT_ASSESSED</span>
                     </div>
                     <span class="text-[11px] text-amber-800 font-mono" id="wo-created-at">Created: 2026-11-03</span>
                 </div>
@@ -3729,10 +3793,10 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <!-- 1. RCA Summary -->
                 <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-1.5">
                     <div class="font-bold text-slate-900 uppercase text-[11px] border-b border-slate-200 pb-1">1. RCA Telemetry Basis</div>
-                    <div class="text-[11px] text-slate-700">Vulnerability Gap: <strong id="wo-kpi-gap" class="text-rose-700">1.45ms</strong></div>
-                    <div class="text-[11px] text-slate-700">Dirty Read Rate: <strong id="wo-kpi-dirty">93.3%</strong></div>
-                    <div class="text-[11px] text-slate-700">Loss / Burst: <strong id="wo-kpi-loss">$7,500.00</strong></div>
-                    <div class="text-[11px] text-emerald-700 font-bold">Defended Value: $150,000/day</div>
+                    <div class="text-[11px] text-slate-700">Measured gap: <strong id="wo-kpi-gap" class="text-rose-700">N/A</strong></div>
+                    <div class="text-[11px] text-slate-700">Collision estimate: <strong id="wo-kpi-dirty">N/A</strong></div>
+                    <div class="text-[11px] text-slate-700">Estimated duplicate loss: <strong id="wo-kpi-loss">N/A</strong></div>
+                    <div class="text-[11px] text-slate-500">Daily defended value: Not assessed</div>
                 </div>
 
                 <!-- 2. Redis Mutex Spec -->
@@ -3812,10 +3876,10 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
             <div class="flex items-center justify-between pt-3 border-t border-gray-200 text-[11px]">
                 <div class="text-gray-500 flex items-center space-x-1.5">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Zero-Regression Assurance &bull; Arbiter Signed-Off</span>
+                    <span>Simulation preview &bull; Approval required</span>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <button onclick="deploySecOpsWorkOrder()" id="btn-deploy-workorder" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded cursor-pointer transition">1-Click Canary Rollout</button>
+                    <button onclick="deploySecOpsWorkOrder()" id="btn-deploy-workorder" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded cursor-pointer transition" disabled>Preview Canary Plan</button>
                     <button onclick="closeSecOpsWorkOrderModal()" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded cursor-pointer transition">Close</button>
                 </div>
             </div>
@@ -3825,18 +3889,70 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
     <!-- ========================================================================= -->
     <!-- 5. JAVASCRIPT CONTROLLERS                                                 -->
     <!-- ========================================================================= -->
+    <div id="modal-model-relationship" class="hidden modal-backdrop-aigis" onclick="if(event.target === this) this.classList.add('hidden');">
+        <div class="bg-white border border-slate-200 p-6 space-y-4 max-w-2xl w-full modal-container-scroll">
+            <h2 class="text-lg font-bold">Manage relationships</h2>
+            <p class="text-xs text-slate-500">Model metadata saved in this browser for this dataset. Cardinality is a declaration, not validated against data. Does not create SQL constraints or change query/filter behavior.</p>
+            <div class="model-form">
+                <label>From table<select id="model-from-table" onchange="updateModelColumnOptions('from')"></select></label>
+                <label>To table<select id="model-to-table" onchange="updateModelColumnOptions('to')"></select></label>
+                <label>From column<select id="model-from-col"></select></label>
+                <label>To column<select id="model-to-col"></select></label>
+                <label>Cardinality<select id="model-cardinality"><option value="1:*">One to many (1:*)</option><option value="*:1">Many to one (*:1)</option><option value="1:1">One to one (1:1)</option><option value="*:*">Many to many (*:*)</option></select></label>
+                <label>Status<select id="model-relation-active"><option value="true">Active</option><option value="false">Inactive</option></select></label>
+            </div>
+            <div id="model-editor-status" role="status" class="text-xs text-slate-600"></div>
+            <div class="flex items-center gap-2">
+                <button id="model-editor-save" onclick="saveModelRelationship()" class="sp-btn sp-btn-p">Save relationship</button>
+                <button onclick="openModelRelationshipEditor()" class="sp-btn sp-btn-s">New</button>
+                <button onclick="document.getElementById('modal-model-relationship').classList.add('hidden')" class="sp-btn sp-btn-s">Close</button>
+            </div>
+            <h3 id="model-list-heading" class="font-bold text-sm">Existing relationships</h3>
+            <div id="model-relationship-list"></div>
+        </div>
+    </div>
     <script>
+        // Dynamic controls use data attributes and listeners, never executable
+        // code assembled from database or assistant-provided values.
+        document.addEventListener('click', function (event) {
+            const control = event.target.closest('[data-aigis-action]');
+            if (!control) return;
+            const value = control.dataset.value;
+            const actions = {
+                connect: () => switchDirectDatabase(decodeURIComponent(value)),
+                delete: () => deleteSpecificUploadedFile(decodeURIComponent(value)),
+                table: () => selectDataViewTable(value),
+                policy: () => toggleSentinelPolicy(value, Number(control.dataset.active)),
+                quick: () => sendCopilotQuickMessage(value),
+                open_work_order: () => openSecOpsWorkOrderModal(),
+                trigger_blue_patch: () => handoffToBlueTeamFromInvestigator(),
+                view_investigator_code: () => openQuantInvestigatorModal(),
+                open_sentinel_modal: () => openSentinelModal(),
+                run_investigator: () => openQuantInvestigatorModal(),
+                view_policies: () => openSentinelModal()
+            };
+            if (Object.hasOwn(actions, control.dataset.aigisAction)) actions[control.dataset.aigisAction]();
+        });
         const API_BASE = window.location.origin;
         const AIGIS_TOKEN = document.querySelector('meta[name="aigis-token"]')?.getAttribute("content") || "";
         const nativeFetch = window.fetch.bind(window);
-        window.fetch = function(input, init) {
-            const requestUrl = typeof input === "string" ? input : (input && input.url) || "";
-            const isSameOrigin = !requestUrl || requestUrl.startsWith("/") || requestUrl.startsWith(API_BASE);
+        window.fetch = async function(input, init) {
+            const requestUrl = new URL(typeof input === "string" || input instanceof URL ? input : input.url, API_BASE);
+            const isSameOrigin = requestUrl.origin === API_BASE;
             if (isSameOrigin && AIGIS_TOKEN) {
                 const options = Object.assign({}, init || {});
-                options.headers = new Headers((init && init.headers) || {});
+                options.headers = new Headers((init && init.headers) || (input instanceof Request ? input.headers : {}));
                 options.headers.set("X-AIGIS-Token", AIGIS_TOKEN);
-                return nativeFetch(input, options);
+                const signal = options.signal || (input instanceof Request ? input.signal : null);
+                const timeout = AbortSignal.timeout(requestUrl.pathname.includes('/stream/') ? 10000 : 120000);
+                options.signal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+                const response = await nativeFetch(input, options);
+                if (!response.ok) {
+                    const body = await response.clone().json().catch(() => ({}));
+                    const detail = body.error || body.detail;
+                    throw new Error(typeof detail === 'string' ? detail : `Request failed (${response.status}). Please retry.`);
+                }
+                return response;
             }
             return nativeFetch(input, init);
         };
@@ -3849,12 +3965,115 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+
+        // Non-blocking feedback; messages are text, never executable markup.
+        function notify(message, type = 'info') {
+            let region = document.getElementById('aigis-notifications');
+            if (!region) {
+                region = document.createElement('div');
+                region.id = 'aigis-notifications';
+                region.setAttribute('aria-label', 'Notifications');
+                document.body.appendChild(region);
+            }
+            const toast = document.createElement('div');
+            toast.className = `aigis-toast aigis-toast-${type}`;
+            toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+            const text = document.createElement('span');
+            text.textContent = message;
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.textContent = 'Dismiss';
+            close.addEventListener('click', () => toast.remove());
+            toast.append(text, close);
+            region.appendChild(toast);
+            while (region.children.length > 4) region.firstElementChild.remove();
+            if (type !== 'error') setTimeout(() => toast.remove(), 8000);
+        }
+
+        function inlineStatus(container, message, retry) {
+            container.replaceChildren();
+            const text = document.createElement('p');
+            text.textContent = message;
+            container.appendChild(text);
+            if (retry) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'aigis-retry';
+                button.textContent = 'Retry';
+                button.addEventListener('click', retry);
+                container.appendChild(button);
+            }
+        }
+
+        // Shared modal lifecycle: focus entry, Tab containment, Escape, and return.
+        const modalStack = [];
+        const modalOpeners = new WeakMap();
+        const focusableSelector = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]';
+        function modalVisible(modal) { return !modal.classList.contains('hidden') && modal.getClientRects().length > 0; }
+        document.querySelectorAll('.modal-backdrop-aigis').forEach((modal, index) => {
+            const dialog = modal.firstElementChild || modal;
+            dialog.setAttribute('role', 'dialog');
+            dialog.setAttribute('aria-modal', 'true');
+            dialog.tabIndex = -1;
+            const heading = dialog.querySelector('h2, h3, h4');
+            if (heading) {
+                if (!heading.id) heading.id = `aigis-dialog-title-${index}`;
+                dialog.setAttribute('aria-labelledby', heading.id);
+            } else dialog.setAttribute('aria-label', 'Dashboard dialog');
+            let wasVisible = false;
+            new MutationObserver(() => {
+                const visible = modalVisible(modal);
+                if (visible === wasVisible) return;
+                wasVisible = visible;
+                if (visible) {
+                    modalOpeners.set(modal, document.activeElement);
+                    modalStack.push(modal);
+                    const first = Array.from(dialog.querySelectorAll(focusableSelector)).find(el => el.getClientRects().length);
+                    (first || dialog).focus();
+                } else {
+                    const position = modalStack.indexOf(modal);
+                    if (position !== -1) modalStack.splice(position, 1);
+                    const opener = modalOpeners.get(modal);
+                    if (opener?.isConnected && opener.getClientRects().length) opener.focus();
+                }
+            }).observe(modal, { attributes: true, attributeFilter: ['class', 'style'] });
+        });
+        document.addEventListener('keydown', event => {
+            const modal = modalStack.filter(modalVisible).at(-1);
+            if (!modal) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                modal.classList.add('hidden');
+            } else if (event.key === 'Tab') {
+                const controls = Array.from(modal.querySelectorAll(focusableSelector)).filter(el => el.getClientRects().length);
+                const first = controls[0], last = controls.at(-1);
+                if (!first) { event.preventDefault(); return; }
+                if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) {
+                    event.preventDefault(); last.focus();
+                } else if (!event.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement))) {
+                    event.preventDefault(); first.focus();
+                }
+            }
+        }, true);
+        document.querySelectorAll('input:not([type="hidden"]):not([type="file"]), textarea, select').forEach(input => {
+            if (!input.labels?.length && !input.hasAttribute('aria-label')) {
+                input.setAttribute('aria-label', input.placeholder || input.id.replaceAll('-', ' ') || 'Input');
+            }
+        });
+        document.querySelectorAll('.stop').forEach(step => {
+            step.setAttribute('role', 'button');
+            step.tabIndex = 0;
+            step.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); step.click(); }
+            });
+        });
         let tweakConfig = { burstStreams: 15, adversarialRounds: 5 };
         let currentFilter = 'all';
         let lastGeneratedSql = "";
 
         // POWER BI GLOBAL STATE (INITIALIZED AT TOP TO PREVENT TDZ REFERENCE ERROR)
-        let dataViewCurrentTable = "dim_users";
+        let dataViewCurrentTable = "telemetry";
         let dataViewCurrentPage = 1;
         let dataViewPageSize = 15;
         let dataViewTotalRows = 0;
@@ -4013,11 +4232,11 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const data = await res.json();
                 const p = data.provider || data.current_config?.provider || provider;
                 const m = data.model_name || data.current_config?.model_name || modelName;
-                alert(`Configuration saved: ${p} (${m})`);
+                notify(`Configuration saved: ${p} (${m})`);
                 await loadAgentConfig();
                 toggleTweaksPanel();
             } catch (err) {
-                alert("Failed to save config: " + err);
+                notify("Failed to save config: " + err.message, 'error');
             }
         }
 
@@ -4048,26 +4267,46 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
             menu.classList.toggle("hidden");
 
             if (!menu.classList.contains("hidden")) {
+                // Render above the ribbon's overflow/stacking contexts without
+                // moving the menu away from its toolbar and file inputs.
+                const button = e?.target.closest('button') || document.getElementById('btn-db-dropdown');
+                const bounds = button.getBoundingClientRect();
+                menu.setAttribute('popover', 'manual');
+                Object.assign(menu.style, {
+                    position: 'fixed', margin: '0', inset: 'auto',
+                    width: Math.min(352, window.innerWidth - 16) + 'px',
+                    maxHeight: Math.max(120, window.innerHeight - bounds.bottom - 16) + 'px',
+                    overflowY: 'auto',
+                    top: Math.min(bounds.bottom + 4, window.innerHeight - 128) + 'px',
+                    left: Math.max(8, Math.min(bounds.right - 352, window.innerWidth - 360)) + 'px'
+                });
+                if (menu.showPopover) menu.showPopover();
+                button.setAttribute('aria-expanded', 'true');
+                const nameEl = menu.querySelector('[data-control-id="dropdown-active-db-name"]');
                 fetch(`${API_BASE}/api/v1/database/info`)
                     .then(r => r.json())
                     .then(d => {
-                        const nameEl = document.getElementById("dropdown-active-db-name");
                         if (nameEl && d.active_db_name) {
                             nameEl.innerText = `${d.active_db_name} (${d.size_mb} MB)`;
                         }
                     })
                     .catch(console.error);
+            } else {
+                if (menu.hidePopover && menu.hasAttribute('popover')) menu.hidePopover();
+                e?.target.closest('button')?.setAttribute('aria-expanded', 'false');
             }
         }
 
         document.addEventListener("click", function(e) {
-            const menu = document.getElementById("db-dropdown-menu");
-            const btn = document.getElementById("btn-db-dropdown");
-            if (menu && !menu.classList.contains("hidden")) {
-                if (!menu.contains(e.target) && !btn.contains(e.target)) {
-                    menu.classList.add("hidden");
+            document.querySelectorAll('[data-control-id="db-dropdown-menu"]').forEach(menu => {
+                const scope = menu.closest('[data-dashboard-controls]');
+                const btn = scope?.querySelector('[data-control-id="btn-db-dropdown"]');
+                if (!menu.contains(e.target) && !btn?.contains(e.target)) {
+                    menu.classList.add('hidden');
+                    if (menu.hidePopover && menu.hasAttribute('popover')) menu.hidePopover();
+                    btn?.setAttribute('aria-expanded', 'false');
                 }
-            }
+            });
         });
 
         function triggerCsvUpload() {
@@ -4109,7 +4348,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert(`Successfully deleted "${data.deleted_file}". Reconnected default "${data.active_db}" (1,000,000 rows).`);
+                    notify(`Deleted "${data.deleted_file}". Reconnected default "${data.active_db}".`);
                     await restoreDefaultTelemetryDb();
                 } else {
                     alert(`Failed to delete database: ${data.error}`);
@@ -4155,8 +4394,8 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                                 <div class="text-[10px] text-gray-500">${escapeHtml(f.size_mb)} MB • ${escapeHtml(f.type.toUpperCase())} • ${activePill}</div>
                             </div>
                             <div class="flex items-center space-x-1.5">
-                                ${!f.is_active ? `<button onclick="switchDirectDatabase(decodeURIComponent('${encodeURIComponent(f.filepath).replace(/'/g, '%27')}'))" class="px-2 py-1 bg-black text-white hover:bg-gray-800 text-[10px] font-bold cursor-pointer font-mono">Connect</button>` : ''}
-                                <button onclick="deleteSpecificUploadedFile(decodeURIComponent('${encodeURIComponent(f.filename).replace(/'/g, '%27')}'))" class="px-2 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 border border-rose-300 text-[10px] font-bold cursor-pointer font-mono">Delete</button>
+                                ${!f.is_active ? `<button data-aigis-action="connect" data-value="${escapeHtml(encodeURIComponent(f.filepath))}" class="px-2 py-1 bg-black text-white hover:bg-gray-800 text-[10px] font-bold cursor-pointer font-mono">Connect</button>` : ''}
+                                <button data-aigis-action="delete" data-value="${escapeHtml(encodeURIComponent(f.filename))}" class="px-2 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 border border-rose-300 text-[10px] font-bold cursor-pointer font-mono">Delete</button>
                             </div>
                         </div>
                     `;
@@ -4192,7 +4431,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     loadDatabaseStats();
                     filterDatabaseRows('all');
         switchCell0Mode('data');
-                    alert(`Connected directly to ${data.db_name}! Tables: ${(data.tables || []).join(", ")}`);
+                    notify(`Connected to ${data.db_name}. Tables: ${(data.tables || []).join(', ')}`);
                 } else {
                     alert("Failed to switch database: " + (data.error || "Unknown error"));
                 }
@@ -4308,6 +4547,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
         async function handleDropdownCsvSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+            const menu = event.target.closest('[data-dashboard-controls]')?.querySelector('[data-control-id="db-dropdown-menu"]');
 
             const statusEl = document.getElementById("dropdown-status-text");
             statusEl.innerText = `Ingesting ${file.name} into SQLite...`;
@@ -4331,10 +4571,12 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         size_mb: data.db_size_mb || 0
                     };
                     updateDatasetDisplay(currentDatasetMeta);
-                    alert(`Ingested ${data.rows_imported.toLocaleString()} rows from ${file.name} into SQLite!`);
+                    notify(`Imported ${data.rows_imported.toLocaleString()} rows from ${file.name}.`);
                     statusEl.innerText = `Connected: ${file.name} (${data.rows_imported.toLocaleString()} rows).`;
                     statusEl.className = "px-3 py-1.5 text-[10px] text-emerald-700 bg-emerald-50 font-bold border-t border-gray-100";
-                    document.getElementById("db-dropdown-menu").classList.add("hidden");
+                    menu?.classList.add("hidden");
+                    powerBiModelCache = null;
+                    await initPowerBiDataView();
                     loadDatabaseStats();
                     filterDatabaseRows('all');
                 } else {
@@ -4342,7 +4584,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     statusEl.innerText = "Error: " + data.error;
                 }
             } catch (err) {
-                alert("Upload failed: " + err);
+                notify("Upload failed: " + err.message, 'error');
                 statusEl.innerText = "Error: " + err;
             } finally {
                 event.target.value = "";
@@ -4352,6 +4594,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
         async function handleDropdownDbSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+            const menu = event.target.closest('[data-dashboard-controls]')?.querySelector('[data-control-id="db-dropdown-menu"]');
 
             const statusEl = document.getElementById("dropdown-status-text");
             statusEl.innerText = `Uploading and connecting to ${file.name}...`;
@@ -4375,10 +4618,12 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         size_mb: data.size_mb || 0
                     };
                     updateDatasetDisplay(currentDatasetMeta);
-                    alert(`Connected successfully to database: ${data.db_name}! Tables: ${data.tables.join(", ")}`);
+                    notify(`Connected to ${data.db_name}. Tables: ${data.tables.join(', ')}`);
                     statusEl.innerText = `Connected: ${data.db_name}`;
                     statusEl.className = "px-3 py-1.5 text-[10px] text-emerald-700 bg-emerald-50 font-bold border-t border-gray-100";
-                    document.getElementById("db-dropdown-menu").classList.add("hidden");
+                    menu?.classList.add("hidden");
+                    powerBiModelCache = null;
+                    await initPowerBiDataView();
                     loadDatabaseStats();
                     filterDatabaseRows('all');
                 } else {
@@ -4386,7 +4631,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     statusEl.innerText = "Error: " + data.error;
                 }
             } catch (err) {
-                alert("Upload failed: " + err);
+                notify("Upload failed: " + err.message, 'error');
                 statusEl.innerText = "Error: " + err;
             } finally {
                 event.target.value = "";
@@ -4423,7 +4668,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         size_mb: data.size_mb || 0
                     };
                     updateDatasetDisplay(currentDatasetMeta);
-                    alert(`Connected successfully to: ${data.db_name}! Tables: ${data.tables.join(", ")}`);
+                    notify(`Connected to ${data.db_name}. Tables: ${data.tables.join(', ')}`);
                     statusEl.innerText = `Connected: ${data.db_name}`;
                     statusEl.className = "px-3 py-1.5 text-[10px] text-emerald-700 bg-emerald-50 font-bold border-t border-gray-100";
                     document.getElementById("db-dropdown-menu").classList.add("hidden");
@@ -4450,7 +4695,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const res = await fetch(`${API_BASE}/api/v1/database/connect`, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({db_path: "D:/Vscode Projects/aigis/backend/datasets/aigis_telemetry.db"})
+                    body: JSON.stringify({db_path: "default"})
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -4458,11 +4703,13 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                         type: 'default',
                         name: 'aigis_telemetry.db',
                         displayName: 'aigis_telemetry.db',
-                        total_rows: 1000000,
-                        size_mb: 473.59
+                        total_rows: data.stats?.total_rows || 0,
+                        size_mb: data.size_mb || 0
                     };
                     updateDatasetDisplay(currentDatasetMeta);
-                    alert("Reconnected to default database: aigis_telemetry.db (1,000,000 records)!");
+                    notify("Reconnected to default database: " + data.db_name);
+                    powerBiModelCache = null;
+                    await initPowerBiDataView();
                     document.getElementById("db-dropdown-menu").classList.add("hidden");
                     loadDatabaseStats();
                     filterDatabaseRows('all');
@@ -4924,7 +5171,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const data = await res.json();
 
                 if (!data.success) {
-                    alert("SQL Execution Error: " + data.error);
+                    notify("SQL execution failed: " + data.error, 'error');
                     metaText.innerText = "Error: " + data.error;
                     return;
                 }
@@ -4944,7 +5191,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                     tbody.appendChild(tr);
                 });
             } catch (err) {
-                alert("Query request failed: " + err);
+                notify("Query request failed: " + err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Execute";
@@ -4973,7 +5220,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const res = await fetch(`${API_BASE}/api/v1/database/sync`, {method: "POST"});
                 const data = await res.json();
                 if (data.success) {
-                    alert(`Synchronized ${data.rows_imported.toLocaleString()} rows into SQLite in ${data.time_taken_sec}s! DB Size: ${data.db_size_mb} MB`);
+                    notify(`Synchronized ${data.rows_imported.toLocaleString()} rows in ${data.time_taken_sec}s. DB size: ${data.db_size_mb} MB.`);
                     const menu = document.getElementById("db-dropdown-menu");
                     if (menu) menu.classList.add("hidden");
                     loadDatabaseStats();
@@ -5065,17 +5312,19 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 }
 
             } catch (err) {
-                alert("Text-to-SQL request failed: " + err);
+                notify("Text-to-SQL request failed: " + err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Translate & Run";
             }
         }
 
-        function copyGeneratedSql() {
+        async function copyGeneratedSql() {
             if (lastGeneratedSql) {
-                navigator.clipboard.writeText(lastGeneratedSql);
-                alert("SQL query copied to clipboard!");
+                try {
+                    await navigator.clipboard.writeText(lastGeneratedSql);
+                    notify('SQL query copied to clipboard.');
+                } catch (error) { notify('Clipboard unavailable. Select and copy the SQL manually.', 'error'); }
             }
         }
 
@@ -5588,7 +5837,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                 jumpToCell('cell-6');
             } catch (err) {
                 console.error("Wargame execution error:", err);
-                alert("Execution error: " + err);
+                notify("Execution error: " + err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerText = "[RUN ALL CELLS]";
@@ -5640,7 +5889,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
         }
 
         function triggerPRCreatedAlert() {
-            alert("Pull Request #142 merged into main repository! Zero-regression verified.");
+            notify("Simulated PR draft only. No pull request was created or merged on GitHub.");
             closePRModal();
         }
 
@@ -5817,7 +6066,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
                 if (container) {
                     if (!res.has_pii_leak) {
-                        container.innerHTML = `<div class="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs">PASSED: No unmasked Credit Card PAN, National ID, or Bearer Token leaks detected. Fully compliant with PCI-DSS Req 3.4.</div>`;
+                        container.innerHTML = `<div class="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs">No matching PII patterns detected in the supplied input. This is not a compliance assessment.</div>`;
                     } else {
                         container.innerHTML = `<div class="font-bold text-rose-700 uppercase text-[11px]">WARNING: ${escapeHtml(res.total_leaks_found)} Unmasked Data Leaks Detected:</div>`;
                         res.findings.forEach(f => {
@@ -5906,11 +6155,12 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     body: JSON.stringify({raw_spec: spec})
                 })).json();
 
+                if (!res.success) throw new Error(res.error || 'Unable to parse OpenAPI document');
                 if (container && res.endpoints) {
                     container.innerHTML = `
                         <div class="flex items-center justify-between text-xs pb-1">
-                            <span class="font-bold text-gray-900">${res.title} (${res.endpoints_count} Endpoints Mapped)</span>
-                            <span class="text-gray-500 font-mono">OpenAPI v${res.version}</span>
+                            <span class="font-bold text-gray-900">${escapeHtml(res.title)} (${res.endpoints_count} Endpoints Mapped)</span>
+                            <span class="text-gray-500 font-mono">OpenAPI v${escapeHtml(res.version)}</span>
                         </div>
                         <div class="overflow-x-auto border border-gray-200 max-h-48">
                             <table class="w-full text-left font-mono text-[11px] bg-white">
@@ -5974,7 +6224,8 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                         client_ip: "192.168.1.105",
                         user_id: "usr_fintech_eval",
                         amount: amount,
-                        device_entropy: entropy
+                        device_entropy: entropy,
+                        simulated_velocity: velocity
                     })
                 })).json();
 
@@ -6083,6 +6334,11 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     console.error("Failed to load model metadata:", e);
                 }
             }
+            const tables = powerBiModelCache?.tables || [];
+            if (!tables.some(table => table.name === dataViewCurrentTable)) {
+                dataViewCurrentTable = tables.find(table => table.name === 'telemetry')?.name || tables[0]?.name || 'telemetry';
+                dataViewCurrentPage = 1;
+            }
             renderDataViewPagesList();
             renderTopPagesNavbar();
             renderDataPaneTables();
@@ -6181,7 +6437,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 item.innerHTML = `
                     <div class="flex items-center space-x-2 truncate">
                         <span class="text-[10px] ${isActive ? 'text-[#107c41] font-bold' : 'text-slate-400 font-medium'} font-mono">${pageNumStr}</span>
-                        <span class="truncate font-semibold text-slate-900">${t.name}</span>
+                        <span class="truncate font-semibold text-slate-900">${escapeHtml(t.name)}</span>
                     </div>
                     <div class="flex items-center space-x-1.5 shrink-0">
                         <span class="text-[10px] text-slate-400 font-mono hidden sm:inline">${rowCountStr}</span>
@@ -6198,6 +6454,8 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             // Update count
             const countEl = document.getElementById("data-pane-tables-count");
             if (countEl) countEl.innerText = `${tables.length} TABLES`;
+            const totalEl = document.getElementById("data-pane-table-total");
+            if (totalEl) totalEl.textContent = `(${tables.length} tables)`;
         }
 
         function filterDataPaneTables() {
@@ -6236,13 +6494,13 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     : "bg-emerald-100 text-emerald-800";
 
                 listEl.innerHTML += `
-                    <div onclick="selectDataViewTable('${t.name}')" 
-                         data-page-name="${t.name.toLowerCase()}"
+                    <div data-aigis-action="table" data-value="${escapeHtml(t.name)}"
+                         data-page-name="${escapeHtml(t.name.toLowerCase())}"
                          class="p-2 border rounded-md cursor-pointer transition flex items-center justify-between gap-1.5 ${bgClass}">
                         <div class="flex items-center space-x-1.5 min-w-0">
                             <span class="text-xs shrink-0">[${t.page_number < 10 ? '0' + t.page_number : t.page_number}]</span>
                             <div class="truncate">
-                                <div class="text-[11px] truncate leading-tight">${t.name}</div>
+                                <div class="text-[11px] truncate leading-tight">${escapeHtml(t.name)}</div>
                                 <div class="text-[9px] text-slate-400 font-mono">Page #${t.page_number < 10 ? '0' + t.page_number : t.page_number}</div>
                             </div>
                         </div>
@@ -6284,7 +6542,12 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             await loadDataViewTable(dataViewCurrentTable, 1);
         }
 
+        let tableRequestController = null;
+        let tableRequestVersion = 0;
         async function loadDataViewTable(tableName, page) {
+            tableRequestController?.abort();
+            tableRequestController = new AbortController();
+            const requestVersion = ++tableRequestVersion;
             const thead = document.getElementById("data-view-thead");
             const tbody = document.getElementById("data-view-tbody");
             const offset = (page - 1) * dataViewPageSize;
@@ -6295,8 +6558,9 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
             try {
                 const searchParam = dataViewSearchQuery ? `&search=${encodeURIComponent(dataViewSearchQuery)}` : "";
-                const res = await fetch(`${API_BASE}/api/v1/database/table_data?table_name=${encodeURIComponent(tableName)}&limit=${dataViewPageSize}&offset=${offset}${searchParam}`);
+                const res = await fetch(`${API_BASE}/api/v1/database/table_data?table_name=${encodeURIComponent(tableName)}&limit=${dataViewPageSize}&offset=${offset}${searchParam}`, { signal: tableRequestController.signal });
                 const data = await res.json();
+                if (requestVersion !== tableRequestVersion) return;
 
                 if (!res.ok || data.error) {
                     if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500 font-mono">Error: ${escapeHtml(data.error || "Failed to load")}</td></tr>`;
@@ -6396,8 +6660,12 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 if (btnLast) btnLast.disabled = (page >= dataViewTotalPages);
 
             } catch (err) {
+                if (err.name === 'AbortError' || requestVersion !== tableRequestVersion) return;
                 console.error("loadDataViewTable error:", err);
-                if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500 font-mono">Error: ${escapeHtml(err.message || err)}</td></tr>`;
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="100" class="px-4 py-6 text-center text-rose-500"></td></tr>';
+                    inlineStatus(tbody.firstElementChild.firstElementChild, `Unable to load table: ${err.message}`, () => loadDataViewTable(tableName, page));
+                }
             }
         }
 
@@ -6437,6 +6705,414 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
         // =========================================================================
         // POWER BI MODEL VIEW: SCHEMA RELATIONSHIP ERD CONTROLLER
         // =========================================================================
+        let modelConnectSource = null;
+        let modelEditingRelationship = null;
+        let restoredModelCache = null;
+        let selectedModelRelationship = null;
+        let modelLayouts = [];
+        let currentModelLayout = 'all';
+        function modelTableVisible(name) {
+            return currentModelLayout === 'all' || !!modelLayouts.find(layout => layout.id === currentModelLayout)?.tables.includes(name);
+        }
+        function refreshModelCanvas() {
+            renderModelNodes(powerBiModelCache.tables);
+            drawModelRelationships();
+        }
+        function toggleModelProperties() {
+            document.getElementById('model-properties').classList.toggle('hidden');
+        }
+        function renderModelLayoutControls() {
+            const tabs = document.getElementById('model-layout-tabs');
+            tabs.replaceChildren();
+            [{id:'all', name:'All tables'}, ...modelLayouts].forEach(layout => {
+                const button = document.createElement('button');
+                button.textContent = layout.name;
+                button.setAttribute('aria-pressed', String(currentModelLayout === layout.id));
+                button.addEventListener('click', () => { currentModelLayout = layout.id; refreshModelCanvas(); fitModelToView(); });
+                tabs.appendChild(button);
+            });
+            const tables = document.getElementById('model-layout-tables');
+            tables.replaceChildren();
+            powerBiModelCache.tables.forEach(table => {
+                const label = document.createElement('label');
+                const check = document.createElement('input'); check.type = 'checkbox';
+                check.checked = modelTableVisible(table.name); check.disabled = currentModelLayout === 'all';
+                check.addEventListener('change', () => {
+                    const layout = modelLayouts.find(layout => layout.id === currentModelLayout);
+                    layout.tables = check.checked ? [...new Set([...layout.tables, table.name])] : layout.tables.filter(name => name !== table.name);
+                    persistModelLayout(); refreshModelCanvas();
+                });
+                label.append(check, document.createTextNode(table.name)); tables.appendChild(label);
+            });
+        }
+        function createModelLayout() {
+            const name = prompt('Layout name', `Layout ${modelLayouts.length + 1}`)?.trim();
+            if (!name) return;
+            const layout = {id: crypto.randomUUID(), name: name.slice(0, 60), tables: selectedModelTable ? [selectedModelTable] : []};
+            modelLayouts.push(layout); currentModelLayout = layout.id;
+            persistModelLayout(); refreshModelCanvas(); fitModelToView();
+        }
+        function showRelatedModelTables() {
+            if (!selectedModelTable) return;
+            const related = new Set([selectedModelTable]);
+            powerBiModelCache.relationships.forEach(r => {
+                if (r.from_table === selectedModelTable || r.to_table === selectedModelTable) { related.add(r.from_table); related.add(r.to_table); }
+            });
+            let layout = modelLayouts.find(layout => layout.id === 'related');
+            if (!layout) { layout = {id:'related', name:'Related tables', tables:[]}; modelLayouts.push(layout); }
+            layout.tables = [...related]; currentModelLayout = layout.id;
+            persistModelLayout(); refreshModelCanvas(); fitModelToView();
+        }
+        let modelLayoutWorker = null;
+        let modelLayoutSequence = 0;
+        let modelUndoSnapshot = null;
+        let modelRoutes = new Map();
+        function modelLayoutInput() {
+            const nodes = powerBiModelCache.tables.filter(t => modelTableVisible(t.name)).map(table => {
+                const card = Array.from(document.querySelectorAll('[data-model-card]')).find(node => node.dataset.modelCard === table.name);
+                const fields = card.querySelector('.model-fields');
+                const rect = card.getBoundingClientRect(), viewport = fields.getBoundingClientRect();
+                const columns = Array.from(card.querySelectorAll('.model-column'));
+                return {id:table.name,width:card.offsetWidth,height:card.offsetHeight,ports:columns.map((column,index) => {
+                    const field = column.getBoundingClientRect();
+                    // Hidden fields fan out along the clipped edge instead of sharing one port.
+                    const center = (field.top + field.bottom)/2;
+                    const y = center < viewport.top ? viewport.top + 2 + index*.25 : center > viewport.bottom ? viewport.bottom - 2 - (columns.length-index)*.25 : center;
+                    return {column:column.dataset.modelCol,x:Math.min(card.offsetWidth-8,8+index*4),y:Math.max(4,Math.min(card.offsetHeight-4,(y-rect.top)/modelZoomScale))};
+                })};
+            });
+            const names = new Set(nodes.map(n=>n.id));
+            return {nodes,edges:powerBiModelCache.relationships.filter(r=>names.has(r.from_table)&&names.has(r.to_table)).map(r=>({...r}))};
+        }
+        function modelLayoutFingerprint() {
+            return JSON.stringify([modelStorageKey(),currentModelLayout,powerBiModelCache.tables.map(t=>[t.name,t.x,t.y]),modelLayoutInput()]);
+        }
+        async function autoArrangeModel() {
+            if (!powerBiModelCache || modelLayoutWorker) return;
+            const input = modelLayoutInput();
+            if (!input.nodes.length) return;
+            const cache = powerBiModelCache, fingerprint = modelLayoutFingerprint(), id = ++modelLayoutSequence;
+            const button = document.getElementById('model-arrange-button');
+            button.disabled = true; button.textContent = 'Optimizing…';
+            const worker = new Worker('/assets/model-layout-worker.js');
+            modelLayoutWorker = worker;
+            try {
+                const result = await new Promise((resolve,reject) => {
+                    const timer = setTimeout(()=>reject(new Error('Layout timed out. Existing positions were kept.')),20000);
+                    worker.onmessage = ({data}) => { if(data.id!==id)return; clearTimeout(timer); data.error?reject(new Error(data.error)):resolve(data.result); };
+                    worker.onerror = event => { clearTimeout(timer); reject(new Error(event.message || 'Layout worker could not start.')); };
+                    worker.postMessage({id,input});
+                });
+                if (cache !== powerBiModelCache || fingerprint !== modelLayoutFingerprint()) {
+                    notify('Model changed during optimization. Result discarded; run Auto arrange again.'); return;
+                }
+                modelUndoSnapshot = {cache,positions:cache.tables.map(t=>({name:t.name,x:t.x,y:t.y})),routes:new Map(modelRoutes)};
+                result.nodes.forEach(node=>{const table=cache.tables.find(t=>t.name===node.id);table.x=node.x;table.y=node.y;});
+                modelRoutes = new Map(result.routes.map(route=>[route.id,{...route,signature:JSON.stringify(input.edges.find(e=>e.id===route.id)),positions:result.nodes.map(n=>[n.id,n.x,n.y])}]));
+                if(result.metrics.overlaps || result.metrics.intersections) {
+                    notify('Layout still has card collisions/intersections. Review the highlighted model before saving.', 'error');
+                }
+                persistModelLayout(); refreshModelCanvas(); fitModelToView();
+                document.getElementById('model-undo-button').disabled = false;
+                const m=result.metrics;
+                document.getElementById('model-hint').textContent = `Optimized 4 candidates · ${m.crossings} crossings · ${m.intersections} card intersections · ${m.overlaps} card overlaps. Dragging or scrolling fields uses fallback routes until the next arrange.`;
+            } catch(error) { notify(`Auto arrange failed: ${error.message}`, 'error'); }
+            finally { worker.terminate(); modelLayoutWorker=null; button.disabled=false;button.textContent='Auto arrange'; }
+        }
+        function undoModelArrange() {
+            if(!modelUndoSnapshot || modelUndoSnapshot.cache!==powerBiModelCache)return;
+            modelUndoSnapshot.positions.forEach(position=>{const table=powerBiModelCache.tables.find(t=>t.name===position.name);if(table){table.x=position.x;table.y=position.y;}});
+            modelRoutes=modelUndoSnapshot.routes; modelUndoSnapshot=null;
+            persistModelLayout();refreshModelCanvas();fitModelToView();
+            document.getElementById('model-undo-button').disabled=true;
+        }
+        function baselineArrangeModel() {
+            if (!powerBiModelCache) return;
+            const tables = powerBiModelCache.tables.filter(t => modelTableVisible(t.name));
+            if (!tables.length) return;
+            const byName = new Map(tables.map(table => [table.name, table]));
+            const neighbors = new Map(tables.map(table => [table.name, new Set()]));
+            powerBiModelCache.relationships.forEach(relation => {
+                if (!byName.has(relation.from_table) || !byName.has(relation.to_table) || relation.from_table === relation.to_table) return;
+                neighbors.get(relation.from_table).add(relation.to_table);
+                neighbors.get(relation.to_table).add(relation.from_table);
+            });
+            const compare = (a, b) => neighbors.get(b).size - neighbors.get(a).size || a.localeCompare(b);
+            const dimensions = new Map(tables.map(table => {
+                const card = Array.from(document.querySelectorAll('[data-model-card]')).find(node => node.dataset.modelCard === table.name);
+                return [table.name, {width: card?.offsetWidth || 220, height: card?.offsetHeight || 250}];
+            }));
+            // Deterministic breadth-first layers keep linked tables together. Cycles
+            // and multiple edges are handled by the visited set, not recursion.
+            const remaining = new Set(tables.map(table => table.name));
+            const components = [];
+            while (remaining.size) {
+                const root = [...remaining].sort(compare)[0];
+                const layers = [[root]];
+                remaining.delete(root);
+                for (let level = 0; level < layers.length; level++) {
+                    const next = [];
+                    layers[level].forEach(name => [...neighbors.get(name)].sort(compare).forEach(other => {
+                        if (remaining.delete(other)) next.push(other);
+                    }));
+                    if (next.length) layers.push(next);
+                }
+                components.push(layers);
+            }
+            const gapX = 100, gapY = 32, clusterGap = 64, padding = 40;
+            const wrapper = document.getElementById('model-canvas-wrapper');
+            const aspect = Math.max(.6, wrapper.clientWidth / Math.max(1, wrapper.clientHeight));
+            const area = tables.reduce((sum, table) => {
+                const size = dimensions.get(table.name);
+                return sum + (size.width + gapX) * (size.height + gapY);
+            }, 0);
+            const targetWidth = Math.max(650, Math.sqrt(area * aspect));
+            let shelfX = padding, shelfY = padding, shelfHeight = 0;
+            components.forEach(layers => {
+                const columns = layers.map(layer => ({
+                    width: Math.max(...layer.map(name => dimensions.get(name).width)),
+                    height: layer.reduce((sum, name) => sum + dimensions.get(name).height + gapY, -gapY)
+                }));
+                const width = columns.reduce((sum, col) => sum + col.width + gapX, -gapX);
+                const height = Math.max(...columns.map(col => col.height));
+                if (shelfX > padding && shelfX + width > targetWidth) {
+                    shelfX = padding; shelfY += shelfHeight + clusterGap; shelfHeight = 0;
+                }
+                let x = shelfX;
+                layers.forEach((layer, index) => {
+                    let y = shelfY + (height - columns[index].height) / 2;
+                    layer.forEach(name => {
+                        const table = byName.get(name);
+                        table.x = Math.round(x); table.y = Math.round(y);
+                        y += dimensions.get(name).height + gapY;
+                    });
+                    x += columns[index].width + gapX;
+                });
+                shelfX += width + clusterGap;
+                shelfHeight = Math.max(shelfHeight, height);
+            });
+            persistModelLayout(); refreshModelCanvas(); fitModelToView();
+        }
+        function fitModelToView() {
+            const tables = powerBiModelCache?.tables.filter(t => modelTableVisible(t.name)) || [];
+            if (!tables.length) return;
+            const wrapper = document.getElementById('model-canvas-wrapper');
+            const left = Math.min(...tables.map(t => t.x)), top = Math.min(...tables.map(t => t.y));
+            const cards = Array.from(document.querySelectorAll('[data-model-card]'));
+            const size = table => cards.find(card => card.dataset.modelCard === table.name);
+            const width = Math.max(...tables.map(t => t.x + (size(t)?.offsetWidth || 220))) - left + 60;
+            const height = Math.max(...tables.map(t => t.y + (size(t)?.offsetHeight || 250))) - top + 60;
+            modelZoomScale = Math.max(.05, Math.min(1.2, Math.max(1, wrapper.clientWidth - 64) / width, Math.max(1, wrapper.clientHeight - 64) / height));
+            applyModelZoom();
+            wrapper.scrollLeft = Math.max(0, left * modelZoomScale - 24);
+            wrapper.scrollTop = Math.max(0, top * modelZoomScale - 24);
+        }
+        function applyModelZoom() {
+            document.getElementById('model-zoom-container').style.transform = `scale(${modelZoomScale})`;
+            document.getElementById('model-zoom-label').textContent = `${Math.round(modelZoomScale * 100)}%`;
+            const zoom = document.getElementById('model-zoom-container');
+            const surface = document.getElementById('model-canvas-surface');
+            surface.style.width = `${zoom.offsetWidth * modelZoomScale}px`;
+            surface.style.height = `${zoom.offsetHeight * modelZoomScale}px`;
+        }
+        function showModelProperties(entries, edit) {
+            const content = document.getElementById('model-properties-content');
+            content.replaceChildren();
+            const list = document.createElement('dl');
+            entries.forEach(([name, value]) => {
+                const row = document.createElement('div'); row.className = 'model-property';
+                const term = document.createElement('dt'); term.textContent = name;
+                const detail = document.createElement('dd'); detail.textContent = value;
+                row.append(term, detail); list.appendChild(row);
+            });
+            content.appendChild(list);
+            if (edit) {
+                const button = document.createElement('button'); button.textContent = 'Edit relationship'; button.addEventListener('click', edit); content.appendChild(button);
+            }
+        }
+        function selectModelRelationship(relation) {
+            selectedModelRelationship = relation.id;
+            document.getElementById('model-properties').classList.remove('hidden');
+            showModelProperties([
+                ['From', `${relation.from_table}.${relation.from_col}`], ['To', `${relation.to_table}.${relation.to_col}`],
+                ['Cardinality', relation.cardinality], ['Status', relation.active === false ? 'Inactive' : 'Active'],
+                ['Validation', 'Declared · Not data-validated'], ['Scope', 'Visual metadata · No filter propagation']
+            ], () => openModelRelationshipEditor(relation));
+            drawModelRelationships();
+            document.querySelectorAll('.model-column').forEach(field => field.classList.toggle('is-source',
+                field.dataset.modelTable === relation.from_table && field.dataset.modelCol === relation.from_col ||
+                field.dataset.modelTable === relation.to_table && field.dataset.modelCol === relation.to_col));
+        }
+        function openModelRelationshipManager() {
+            openModelRelationshipEditor();
+            document.querySelector('#modal-model-relationship .model-form').classList.add('hidden');
+            document.getElementById('model-editor-save').classList.add('hidden');
+            document.getElementById('model-list-heading').classList.remove('hidden');
+            document.getElementById('model-relationship-list').classList.remove('hidden');
+            document.getElementById('model-editor-status').textContent = 'Select a relationship to edit, or create a new one.';
+        }
+        function modelStorageKey() {
+            return `aigis:model:v1:${powerBiModelCache.model_dataset_id || powerBiModelCache.active_database}`;
+        }
+        function validModelRelationship(relation) {
+            return ['from', 'to'].every(side => powerBiModelCache.tables.some(table => table.name === relation[`${side}_table`] && table.columns.some(column => column.name === relation[`${side}_col`]))) && ['1:*', '*:1', '1:1', '*:*'].includes(relation.cardinality);
+        }
+        function restoreModelLayout() {
+            if (restoredModelCache === powerBiModelCache) return;
+            restoredModelCache = powerBiModelCache;
+            modelConnectSource = null;
+            modelLayouts = []; currentModelLayout = 'all'; selectedModelRelationship = null;
+            modelRoutes = new Map(); modelUndoSnapshot = null;
+            document.getElementById('model-undo-button').disabled = true;
+            powerBiModelCache.relationships = (powerBiModelCache.relationships || []).filter(validModelRelationship);
+            try {
+                const saved = JSON.parse(localStorage.getItem(modelStorageKey()) || 'null');
+                if (!saved) return;
+                modelLayouts = (Array.isArray(saved.layouts) ? saved.layouts : []).filter(layout => typeof layout.id === 'string' && layout.id !== 'all' && typeof layout.name === 'string' && Array.isArray(layout.tables)).map(layout => ({...layout, tables: layout.tables.filter(name => powerBiModelCache.tables.some(t => t.name === name))}));
+                if (Array.isArray(saved.relationships)) powerBiModelCache.relationships = saved.relationships.filter(validModelRelationship);
+                powerBiModelCache.tables.forEach(table => {
+                    const position = saved.positions?.[table.name];
+                    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+                        table.x = Math.max(0, Math.min(10000, position.x));
+                        table.y = Math.max(0, Math.min(10000, position.y));
+                    }
+                });
+            } catch (error) { notify('Saved model could not be restored. Using the current schema.', 'error'); }
+        }
+        function persistModelLayout() {
+            const positions = Object.fromEntries(powerBiModelCache.tables.map(table => [table.name, {x: table.x, y: table.y}]));
+            try { localStorage.setItem(modelStorageKey(), JSON.stringify({positions, relationships: powerBiModelCache.relationships, layouts: modelLayouts})); }
+            catch (error) { notify('Browser storage unavailable. Model changes last only for this session.', 'error'); }
+        }
+        function wireModelCard(card, table) {
+            const header = card.querySelector('.model-table-header');
+            header.addEventListener('pointerdown', event => {
+                if (event.button !== 0) return;
+                modelRoutes.clear();
+                event.preventDefault();
+                header.setPointerCapture(event.pointerId);
+                const start = {x: event.clientX, y: event.clientY, left: table.x, top: table.y};
+                card.dataset.dragged = 'false';
+                const move = current => {
+                    if (Math.abs(current.clientX - start.x) + Math.abs(current.clientY - start.y) > 4) card.dataset.dragged = 'true';
+                    table.x = Math.max(0, Math.min(10000, start.left + (current.clientX - start.x) / modelZoomScale));
+                    table.y = Math.max(0, Math.min(10000, start.top + (current.clientY - start.y) / modelZoomScale));
+                    card.style.left = `${table.x}px`; card.style.top = `${table.y}px`;
+                    drawModelRelationships();
+                };
+                const end = () => {
+                    header.removeEventListener('pointermove', move);
+                    header.removeEventListener('pointerup', end);
+                    header.removeEventListener('pointercancel', end);
+                    persistModelLayout();
+                    const zoom = document.getElementById('model-zoom-container');
+                    zoom.style.width = `${Math.max(1950, ...powerBiModelCache.tables.map(t => t.x + 300))}px`;
+                    zoom.style.height = `${Math.max(1150, ...powerBiModelCache.tables.map(t => t.y + 360))}px`;
+                    applyModelZoom();
+                    setTimeout(() => { card.dataset.dragged = 'false'; }, 0);
+                };
+                header.addEventListener('pointermove', move);
+                header.addEventListener('pointerup', end);
+                header.addEventListener('pointercancel', end);
+            });
+            card.querySelector('.model-fields').addEventListener('scroll', () => { modelRoutes.clear(); drawModelRelationships(); });
+            card.querySelectorAll('.model-column').forEach(column => {
+                const source = {table: table.name, column: column.dataset.modelCol};
+                column.addEventListener('click', event => {
+                    event.stopPropagation();
+                    if (modelConnectSource && modelConnectSource.table !== source.table) {
+                        openModelRelationshipEditor(null, modelConnectSource, source);
+                        modelConnectSource = null;
+                    } else {
+                        modelConnectSource = source;
+                        document.querySelectorAll('.model-column').forEach(node => node.classList.remove('is-source'));
+                        column.classList.add('is-source');
+                        document.getElementById('model-selected-entity-details').textContent = `Connect ${source.table}.${source.column}: select a column in another table.`;
+                    }
+                });
+                column.addEventListener('dragstart', event => {
+                    event.dataTransfer.setData('application/x-aigis-column', JSON.stringify(source));
+                    event.dataTransfer.effectAllowed = 'link';
+                });
+                column.addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'link'; });
+                column.addEventListener('drop', event => {
+                    event.preventDefault(); event.stopPropagation();
+                    try {
+                        const from = JSON.parse(event.dataTransfer.getData('application/x-aigis-column'));
+                        if (from.table !== source.table) openModelRelationshipEditor(null, from, source);
+                    } catch (error) { /* Ignore unrelated drag data. */ }
+                });
+            });
+        }
+        function updateModelColumnOptions(side, selected) {
+            const table = powerBiModelCache.tables.find(table => table.name === document.getElementById(`model-${side}-table`).value);
+            const select = document.getElementById(`model-${side}-col`);
+            select.replaceChildren(...(table?.columns || []).map(column => new Option(`${column.name} (${column.type || 'any'})`, column.name)));
+            if (selected && table?.columns.some(column => column.name === selected)) select.value = selected;
+        }
+        function openModelRelationshipEditor(relation = null, from = null, to = null) {
+            if (!powerBiModelCache?.tables?.length) { notify('No tables are available to connect.', 'error'); return; }
+            modelEditingRelationship = relation?.id || null;
+            document.querySelector('#modal-model-relationship .model-form').classList.remove('hidden');
+            document.getElementById('model-editor-save').classList.remove('hidden');
+            document.getElementById('model-list-heading').classList.add('hidden');
+            document.getElementById('model-relationship-list').classList.add('hidden');
+            ['from', 'to'].forEach((side, index) => {
+                const select = document.getElementById(`model-${side}-table`);
+                select.replaceChildren(...powerBiModelCache.tables.map(table => new Option(table.name, table.name)));
+                const endpoint = side === 'from' ? from : to;
+                select.value = relation?.[`${side}_table`] || endpoint?.table || powerBiModelCache.tables[Math.min(index, powerBiModelCache.tables.length - 1)].name;
+                updateModelColumnOptions(side, relation?.[`${side}_col`] || endpoint?.column);
+            });
+            document.getElementById('model-cardinality').value = relation?.cardinality || '1:*';
+            document.getElementById('model-relation-active').value = String(relation?.active !== false);
+            document.getElementById('model-editor-status').textContent = relation ? 'Editing relationship' : 'Choose the columns to connect.';
+            renderModelRelationshipList();
+            document.getElementById('modal-model-relationship').classList.remove('hidden');
+        }
+        function saveModelRelationship() {
+            const relation = {id: modelEditingRelationship || crypto.randomUUID()};
+            ['from', 'to'].forEach(side => {
+                relation[`${side}_table`] = document.getElementById(`model-${side}-table`).value;
+                relation[`${side}_col`] = document.getElementById(`model-${side}-col`).value;
+            });
+            relation.cardinality = document.getElementById('model-cardinality').value;
+            relation.active = document.getElementById('model-relation-active').value === 'true';
+            const endpoints = r => [`${r.from_table}\u0000${r.from_col}`, `${r.to_table}\u0000${r.to_col}`].sort().join('\u0001');
+            const duplicate = powerBiModelCache.relationships.some(r => r.id !== relation.id && endpoints(r) === endpoints(relation));
+            if (!validModelRelationship(relation) || relation.from_table === relation.to_table || duplicate) {
+                document.getElementById('model-editor-status').textContent = duplicate ? 'This column pair is already connected.' : 'Select valid columns in two different tables.';
+                return;
+            }
+            powerBiModelCache.relationships = powerBiModelCache.relationships.filter(r => r.id !== relation.id).concat(relation);
+            modelEditingRelationship = relation.id;
+            persistModelLayout(); renderModelNodes(powerBiModelCache.tables); drawModelRelationships(); renderModelRelationshipList();
+            document.getElementById('model-editor-status').textContent = 'Relationship saved in this browser. Cardinality not data-validated.';
+        }
+        function renderModelRelationshipList() {
+            const list = document.getElementById('model-relationship-list');
+            list.replaceChildren();
+            powerBiModelCache.relationships.forEach(relation => {
+                const row = document.createElement('div'); row.className = 'model-relation-item';
+                const edit = document.createElement('button'); edit.type = 'button';
+                edit.textContent = `${relation.from_table}.${relation.from_col} (${relation.cardinality}) ${relation.to_table}.${relation.to_col} · ${relation.active === false ? 'Inactive' : 'Active'}`;
+                edit.addEventListener('click', () => openModelRelationshipEditor(relation));
+                const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete';
+                remove.setAttribute('aria-label', `Delete relationship ${relation.from_table} to ${relation.to_table}`);
+                remove.addEventListener('click', () => {
+                    if (!confirm('Delete this model relationship? SQL data and constraints are unchanged.')) return;
+                    powerBiModelCache.relationships = powerBiModelCache.relationships.filter(r => r.id !== relation.id);
+                    modelEditingRelationship = null;
+                    selectedModelRelationship = null;
+                    persistModelLayout(); renderModelNodes(powerBiModelCache.tables); drawModelRelationships(); renderModelRelationshipList();
+                    showModelProperties([['Selection', 'Relationship deleted']]);
+                    document.getElementById('model-editor-status').textContent = 'Relationship deleted.';
+                });
+                row.append(edit, remove); list.appendChild(row);
+            });
+            if (!list.children.length) list.textContent = 'No relationships yet. Connect two columns to get started.';
+        }
+
         async function initPowerBiModelView() {
             if (!powerBiModelCache) {
                 try {
@@ -6448,6 +7124,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 }
             }
 
+            restoreModelLayout();
             const tables = powerBiModelCache.tables || [];
             const relations = powerBiModelCache.relationships || [];
 
@@ -6457,7 +7134,25 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             if (countRelEl) countRelEl.innerText = relations.length;
 
             renderModelNodes(tables);
+            // Older saved/default layouts used shorter cards. Repair only collisions.
+            const placed = [];
+            tables.forEach(table => {
+                const card = Array.from(document.querySelectorAll('[data-model-card]')).find(node => node.dataset.modelCard === table.name);
+                if (!card) return;
+                const height = card.offsetHeight;
+                while (placed.some(other => table.x < other.x + 244 && table.x + 244 > other.x && table.y < other.y + other.height + 24 && table.y + height + 24 > other.y)) {
+                    table.y = Math.max(...placed.filter(other => table.x < other.x + 244 && table.x + 244 > other.x).map(other => other.y + other.height + 32));
+                }
+                card.style.top = `${table.y}px`;
+                placed.push({x: table.x, y: table.y, height});
+            });
             drawModelRelationships();
+            if (!tables.some(table => table.name === selectedModelTable)) selectedModelTable = tables[0]?.name || null;
+            if (selectedModelTable) selectModelTable(selectedModelTable);
+            ['all', 'FACT', 'DIMENSION'].forEach((category, index) => {
+                const button = document.getElementById(['btn-model-cat-all', 'btn-model-cat-facts', 'btn-model-cat-dims'][index]);
+                if (button) button.textContent = `${['All', 'Facts', 'Dims'][index]} (${tables.filter(t => category === 'all' || t.type === category).length})`;
+            });
         }
 
         function renderModelNodes(tables) {
@@ -6466,20 +7161,16 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
             container.innerHTML = "";
             tables.forEach(t => {
-                if (activeModelCategory !== "all" && t.type !== activeModelCategory) {
+                if (!modelTableVisible(t.name)) {
                     return;
                 }
 
                 const isFact = (t.type === "FACT");
                 const isSelected = (t.name === selectedModelTable);
-                const headerBg = isFact ? "bg-sky-50 border-b border-sky-100" : "bg-slate-50 border-b border-slate-200";
-                const borderAccent = isSelected 
-                    ? "border-2 border-[#1b75bb] shadow-lg ring-2 ring-[#1b75bb]/20" 
-                    : isFact ? "border border-sky-200 shadow-sm" : "border border-slate-200 shadow-sm";
 
                 let columnsHtml = "";
                 const cols = t.columns || [];
-                const displayCols = cols.slice(0, 7);
+                const displayCols = cols;
                 displayCols.forEach(c => {
                     let icon = "";
                     let colStyle = "text-slate-600";
@@ -6491,53 +7182,46 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                         colStyle = "text-sky-700 font-semibold";
                     }
                     columnsHtml += `
-                        <div class="flex items-center justify-between py-0.5 text-[10px] font-mono leading-tight">
+                        <button type="button" draggable="true" data-model-table="${escapeHtml(t.name)}" data-model-col="${escapeHtml(c.name)}" class="model-column ${modelConnectSource?.table === t.name && modelConnectSource?.column === c.name ? 'is-source' : ''}" aria-label="Connect ${escapeHtml(t.name)} ${escapeHtml(c.name)}">
                             <span class="flex items-center space-x-1 truncate ${colStyle}">
-                                <span class="text-[9px] shrink-0">${icon}</span>
-                                <span class="truncate">${c.name}</span>
+                                <span class="model-key">${icon}</span>
+                                <span class="truncate">${escapeHtml(c.name)}</span>
                             </span>
-                            <span class="text-slate-400 text-[9px] lowercase shrink-0">${c.type || 'text'}</span>
-                        </div>
+                            <small>${escapeHtml(c.type || 'text')}</small>
+                        </button>
                     `;
                 });
-                if (cols.length > 7) {
-                    columnsHtml += `<div class="text-[9px] text-slate-400 italic pt-0.5">+ ${cols.length - 7} more columns...</div>`;
-                }
 
                 const card = document.createElement("div");
                 card.id = `model-card-${t.name}`;
-                card.className = `absolute bg-white rounded-md cursor-pointer transition-all duration-150 select-none ${borderAccent}`;
+                card.className = `absolute model-card select-none ${isSelected ? 'is-selected' : ''}`;
+                card.dataset.modelCard = t.name;
                 card.style.left = `${t.x}px`;
                 card.style.top = `${t.y}px`;
                 card.style.width = "220px";
                 card.style.zIndex = isSelected ? "30" : "20";
 
                 card.innerHTML = `
-                    <div class="px-2.5 py-1.5 ${headerBg} rounded-t-md flex items-center justify-between">
-                        <div class="flex items-center space-x-1.5 truncate">
-                            <span class="text-xs shrink-0">[${t.page_number < 10 ? '0' + t.page_number : t.page_number}]</span>
-                            <strong class="text-xs text-slate-900 truncate">${t.name}</strong>
-                        </div>
-                        <span class="text-[9px] font-bold px-1 py-0.2 rounded ${isFact ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}">
-                            ${t.type === 'FACT' ? 'FACT' : 'DIM'}
-                        </span>
-                    </div>
-                    <div class="p-2 space-y-0.5 max-h-[170px] overflow-hidden">
+                    <div class="model-table-header" title="${escapeHtml(t.name)} · Drag to move">${escapeHtml(t.name)}</div>
+                    <div class="model-fields">
                         ${columnsHtml}
-                    </div>
-                    <div class="px-2.5 py-1 bg-slate-50/70 border-t border-slate-100 rounded-b-md flex items-center justify-between text-[9px] font-mono text-slate-400">
-                        <span>Page #${t.page_number < 10 ? '0' + t.page_number : t.page_number}</span>
-                        <span>${(t.row_count || 0).toLocaleString()} rows</span>
                     </div>
                 `;
 
                 card.onclick = (e) => {
                     e.stopPropagation();
+                    if (e.target.closest('.model-column') || card.dataset.dragged === 'true') return;
                     selectModelTable(t.name);
                 };
 
                 container.appendChild(card);
+                wireModelCard(card, t);
             });
+            const zoom = document.getElementById('model-zoom-container');
+            if (zoom) { zoom.style.width = `${Math.max(1950, ...tables.map(t => t.x + 300))}px`; zoom.style.height = `${Math.max(1150, ...tables.map(t => t.y + 360))}px`; }
+            applyModelZoom();
+            document.getElementById('model-count-relations').textContent = (powerBiModelCache.relationships || []).length;
+            renderModelLayoutControls();
         }
 
         function drawModelRelationships(filterTable) {
@@ -6565,13 +7249,14 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 const tFrom = tablesMap[r.from_table];
                 const tTo = tablesMap[r.to_table];
                 if (!tFrom || !tTo) return;
+                if (!Array.from(document.querySelectorAll('[data-model-card]')).some(card => card.dataset.modelCard === r.from_table) ||
+                    !Array.from(document.querySelectorAll('[data-model-card]')).some(card => card.dataset.modelCard === r.to_table)) return;
 
                 if (activeModelCategory !== "all") {
                     if (tFrom.type !== activeModelCategory && tTo.type !== activeModelCategory) return;
                 }
 
-                const isConnected = (filterTable && (r.from_table === filterTable || r.to_table === filterTable)) 
-                    || (!filterTable && (r.from_table === selectedModelTable || r.to_table === selectedModelTable));
+                const isConnected = selectedModelRelationship === r.id;
 
                 const cardW = 220;
                 let x1, y1, x2, y2;
@@ -6589,11 +7274,31 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 }
 
                 const dx = Math.abs(x2 - x1) * 0.45;
-                const pathData = `M ${x1} ${y1} C ${x1 + (x2 > x1 ? dx : -dx)} ${y1}, ${x2 + (x2 > x1 ? -dx : dx)} ${y2}, ${x2} ${y2}`;
+                const fieldY = (table, column) => {
+                    const card = Array.from(document.querySelectorAll('[data-model-card]')).find(node => node.dataset.modelCard === table.name);
+                    const field = Array.from(card?.querySelectorAll('.model-column') || []).find(node => node.dataset.modelCol === column);
+                    const fields = card?.querySelector('.model-fields');
+                    if (!field || !fields) return table.y + 45;
+                    const cardRect = card.getBoundingClientRect();
+                    const fieldRect = field.getBoundingClientRect();
+                    const fieldsRect = fields.getBoundingClientRect();
+                    const center = Math.max(fieldsRect.top + 4, Math.min(fieldsRect.bottom - 4, fieldRect.top + fieldRect.height / 2));
+                    return table.y + (center - cardRect.top) / modelZoomScale;
+                };
+                y1 = fieldY(tFrom, r.from_col);
+                y2 = fieldY(tTo, r.to_col);
+                const routed = modelRoutes.get(r.id);
+                const validRoute = routed && routed.signature === JSON.stringify(r) && routed.positions.every(([name,x,y]) => {
+                    const table=tablesMap[name];return table && table.x===x && table.y===y;
+                });
+                const middle = (x1+x2)/2;
+                const points = validRoute ? routed.points : [{x:x1,y:y1},{x:middle,y:y1},{x:middle,y:y2},{x:x2,y:y2}];
+                const pathData = points.map((point,index)=>`${index?'L':'M'} ${point.x} ${point.y}`).join(' ');
+                x1=points[0].x;y1=points[0].y;x2=points.at(-1).x;y2=points.at(-1).y;
 
-                const strokeColor = isConnected ? "#0284c7" : "#cbd5e1";
+                const strokeColor = isConnected ? "#107c41" : "#9ca3af";
                 const strokeWidth = isConnected ? "2.5" : "1.5";
-                const strokeDash = isConnected ? "none" : (r.cardinality === "1:1" ? "4,4" : "none");
+                const strokeDash = r.active === false ? '5,5' : 'none';
 
                 // SVG Path
                 const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -6602,9 +7307,25 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 pathEl.setAttribute("stroke", strokeColor);
                 pathEl.setAttribute("stroke-width", strokeWidth);
                 pathEl.setAttribute("stroke-dasharray", strokeDash);
-                pathEl.setAttribute("marker-end", isConnected ? "url(#arrow-active)" : "url(#arrow)");
                 pathEl.setAttribute("id", `model-rel-${r.id}`);
                 pathEl.style.transition = "stroke 0.2s, stroke-width 0.2s";
+                pathEl.style.pointerEvents = 'stroke';
+                pathEl.style.cursor = 'pointer';
+                pathEl.setAttribute('tabindex', '0');
+                pathEl.setAttribute('role', 'button');
+                const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+                hit.setAttribute('d',pathData);hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','14');hit.setAttribute('fill','none');
+                hit.style.pointerEvents='stroke';hit.style.cursor='pointer';
+                hit.addEventListener('click',()=>selectModelRelationship(r));
+                hit.addEventListener('dblclick',()=>openModelRelationshipEditor(r));
+                svg.appendChild(hit);
+                pathEl.setAttribute('aria-label', `Edit ${r.from_table}.${r.from_col} to ${r.to_table}.${r.to_col}`);
+                pathEl.addEventListener('click', () => selectModelRelationship(r));
+                pathEl.addEventListener('dblclick', () => openModelRelationshipEditor(r));
+                pathEl.addEventListener('keydown', event => { if (event.key === 'Enter') selectModelRelationship(r); });
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = `${r.from_table}.${r.from_col} → ${r.to_table}.${r.to_col} (${r.cardinality})`;
+                pathEl.appendChild(title);
                 svg.appendChild(pathEl);
 
                 // Cardinality badge '1' on from_table side
@@ -6615,7 +7336,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 text1.setAttribute("font-family", "monospace");
                 text1.setAttribute("font-weight", "bold");
                 text1.setAttribute("fill", isConnected ? "#0284c7" : "#64748b");
-                text1.textContent = "1";
+                text1.textContent = (r.cardinality || '1:*').split(':')[0];
                 svg.appendChild(text1);
 
                 // Cardinality badge '*' on to_table side
@@ -6626,13 +7347,14 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 textStar.setAttribute("font-family", "monospace");
                 textStar.setAttribute("font-weight", "bold");
                 textStar.setAttribute("fill", isConnected ? "#0284c7" : "#64748b");
-                textStar.textContent = r.cardinality === "1:1" ? "1" : "*";
+                textStar.textContent = (r.cardinality || '1:*').split(':')[1];
                 svg.appendChild(textStar);
             });
         }
 
         function selectModelTable(tableName) {
             selectedModelTable = tableName;
+            selectedModelRelationship = null;
             const tables = (powerBiModelCache?.tables || []);
             const t = tables.find(x => x.name === tableName);
             if (!t) return;
@@ -6648,8 +7370,9 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             const relations = powerBiModelCache?.relationships || [];
             const linked = relations.filter(r => r.from_table === tableName || r.to_table === tableName);
             if (detailsEl) {
-                detailsEl.innerText = `${(t.columns || []).length} Columns • ${(t.row_count || 0).toLocaleString()} rows • ${linked.length} Active Relations`;
+                detailsEl.innerText = `${(t.columns || []).length} columns · ${linked.length} relationships`;
             }
+            showModelProperties([['Table', t.name], ['Category', t.type || 'TABLE'], ['Rows', (t.row_count || 0).toLocaleString()], ['Columns', String(t.columns.length)], ['Description', t.description || 'No description']]);
         }
 
         function filterModelCategory(cat) {
@@ -6673,7 +7396,8 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
         }
 
         function zoomModelCanvas(delta) {
-            modelZoomScale = Math.min(1.8, Math.max(0.5, modelZoomScale + delta));
+            modelZoomScale = Math.min(1.8, Math.max(0.15, modelZoomScale + delta));
+            applyModelZoom();
             const container = document.getElementById("model-zoom-container");
             if (container) {
                 container.style.transform = `scale(${modelZoomScale})`;
@@ -6682,6 +7406,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
         function resetModelCanvas() {
             modelZoomScale = 1.0;
+            applyModelZoom();
             const container = document.getElementById("model-zoom-container");
             if (container) {
                 container.style.transform = `scale(1.0)`;
@@ -6689,7 +7414,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
         }
 
         function jumpToDataViewFromModel() {
-            switchCell0Mode('data');
+            switchPowerBiView('data');
             selectDataViewTable(selectedModelTable);
         }
 
@@ -6704,19 +7429,31 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
         let tableAutoRefreshEnabled = false;
         let unappliedStreamCount = 0;
         let lastObservedStreamTotal = 0;
+        let liveStreamPollBusy = false;
+        let liveStreamFailures = 0;
 
         async function initLiveStreamPoller() {
-            if (liveStreamPollTimer) clearInterval(liveStreamPollTimer);
-            liveStreamPollTimer = setInterval(pollLiveStreamBatch, 1500);
+            clearTimeout(liveStreamPollTimer);
             await pollLiveStreamBatch();
         }
 
+        document.addEventListener('visibilitychange', () => {
+            clearTimeout(liveStreamPollTimer);
+            if (!document.hidden) pollLiveStreamBatch();
+        });
+
         async function pollLiveStreamBatch() {
+            if (document.hidden || liveStreamPollBusy) return;
+            liveStreamPollBusy = true;
+            clearTimeout(liveStreamPollTimer);
             try {
                 const res = await fetch(`${API_BASE}/api/v1/stream/events?limit=15`);
                 if (!res.ok) return;
                 const data = await res.json();
                 const st = data.status || {};
+                liveStreamFailures = 0;
+                const connection = document.getElementById('header-stream-toggle-btn');
+                if (connection) connection.title = `Connected · Updated ${new Date().toLocaleTimeString()}`;
                 
                 isLiveStreamPaused = !!st.is_paused;
                 
@@ -6738,7 +7475,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     }
                 } else {
                     const tps = st.configured_tps || 10;
-                    if (headerLabel) headerLabel.textContent = `LIVE FEED: ${tps} TX/S (99% BENIGN | 1% ATTACK)`;
+                    if (headerLabel) headerLabel.textContent = st.is_running ? `SIMULATED FEED: ${tps} TX/S` : 'SIMULATED FEED: STOPPED';
                     if (headerDot) {
                         headerDot.className = "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse";
                     }
@@ -6752,13 +7489,14 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                 // 2. Update Sidebar Live Telemetry Stream Card
                 const streamedCountEl = document.getElementById("sidebar-streamed-count");
                 if (streamedCountEl) {
-                    const totalRows = (1000000 + (st.total_streamed || 0)).toLocaleString();
-                    streamedCountEl.textContent = totalRows;
+                    streamedCountEl.textContent = (st.total_streamed || 0).toLocaleString();
+                    streamedCountEl.title = 'Events generated this session; not the active dataset row count';
                 }
                 const liveAttacksEl = document.getElementById("sidebar-live-attacks");
                 if (liveAttacksEl) {
                     const attacks = st.attack_count || 0;
-                    liveAttacksEl.textContent = `${attacks.toLocaleString()} (1.0%)`;
+                    const ratio = st.total_streamed ? (100 * attacks / st.total_streamed).toFixed(1) : '0.0';
+                    liveAttacksEl.textContent = `${attacks.toLocaleString()} (${ratio}%)`;
                 }
                 const stolenEl = document.getElementById("sidebar-stolen");
                 if (stolenEl) {
@@ -6802,7 +7540,13 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                     }
                 }
             } catch (err) {
+                liveStreamFailures++;
+                const label = document.getElementById('header-stream-label');
+                if (label) label.textContent = 'FEED STALE · RECONNECTING';
                 console.warn("[AIGIS Stream] Poll failed:", err);
+            } finally {
+                liveStreamPollBusy = false;
+                if (!document.hidden) liveStreamPollTimer = setTimeout(pollLiveStreamBatch, Math.min(30000, 1500 * 2 ** liveStreamFailures));
             }
         }
 
@@ -7057,7 +7801,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
                                     </span>
                                 </td>
                                 <td class="p-2 text-right">
-                                    <button onclick="toggleSentinelPolicy('${escapeHtml(p.rule_id)}', ${isActive ? 0 : 1})" class="px-2 py-0.5 rounded text-[10px] font-bold border ${isActive ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'} cursor-pointer">
+                                    <button data-aigis-action="policy" data-value="${escapeHtml(p.rule_id)}" data-active="${isActive ? 0 : 1}" class="px-2 py-0.5 rounded text-[10px] font-bold border ${isActive ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'} cursor-pointer">
                                         ${isActive ? 'Disable' : 'Enable'}
                                     </button>
                                 </td>
@@ -7180,7 +7924,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             } catch (err) {
                 console.error("[Investigator] Diagnosis error:", err);
             } finally {
-                if (btn) btn.textContent = "Run Sandbox Python RCA";
+                if (btn) btn.textContent = "Run Read-Only Analysis";
             }
         }
 
@@ -7190,7 +7934,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
 
             const qm = report.quantitative_metrics || {};
             const rca = report.root_cause_analysis || {};
-            const sb = report.sandbox_result || {};
+            const sb = report.sandbox_execution || {};
 
             // 1. Update Banner
             const threatBadge = document.getElementById("investigator-threat-badge");
@@ -7198,8 +7942,9 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             const summaryEl = document.getElementById("investigator-rca-summary");
             const patchEl = document.getElementById("investigator-patch-spec");
 
-            if (threatBadge) threatBadge.textContent = `${report.threat_type || 'TOCTOU RACE CONDITION'} DETECTED`;
-            if (incIdEl) incIdEl.textContent = report.incident_id || "INC-2026";
+            if (threatBadge) threatBadge.textContent = report.status === 'UNSUPPORTED_DATASET'
+                ? 'UNSUPPORTED DATASET' : report.has_vulnerability ? 'CONCURRENCY ANOMALY DETECTED' : 'NO CONCURRENCY ANOMALY DETECTED';
+            if (incIdEl) incIdEl.textContent = report.incident_id || "No incident generated";
             if (summaryEl) summaryEl.textContent = rca.rca_summary || "No RCA summary available.";
             if (patchEl) patchEl.textContent = rca.remediation_patch || "No remediation specification available.";
 
@@ -7229,7 +7974,7 @@ def exploit_step_skipping_fulfillment(user_id, order_id):
             // 4. Update Terminal View
             const termView = document.getElementById("investigator-terminal-view");
             if (termView) {
-                termView.textContent = `[SANDBOX SUBPROCESS OUTPUT (Exit Code: ${sb.returncode})]
+                termView.textContent = `[IN-PROCESS ANALYSIS: ${sb.success ? 'COMPLETED' : 'UNAVAILABLE'}]
 ` + (sb.stdout || JSON.stringify(qm, null, 2)) + (sb.stderr ? `
 [STDERR]:
 ${sb.stderr}` : '');
@@ -7337,15 +8082,9 @@ ${sb.stderr}` : '');
                 if (actionsCont && actionsPills) {
                     if (Array.isArray(data.suggested_actions) && data.suggested_actions.length > 0) {
                         actionsPills.innerHTML = data.suggested_actions.map(act => {
-                            let clickFn = `sendCopilotQuickMessage('${act.label}')`;
-                            if (act.action === 'open_work_order') clickFn = 'openSecOpsWorkOrderModal()';
-                            else if (act.action === 'trigger_blue_patch') clickFn = 'handoffToBlueTeamFromInvestigator()';
-                            else if (act.action === 'view_investigator_code') clickFn = 'openQuantInvestigatorModal()';
-                            else if (act.action === 'open_sentinel_modal') clickFn = 'openSentinelModal()';
-                            else if (act.action === 'run_investigator') clickFn = 'openQuantInvestigatorModal()';
-                            else if (act.action === 'view_policies') clickFn = 'openSentinelModal()';
-
-                            return `<button onclick="${clickFn}" style="background-color: #ffffff !important; color: #047857 !important; border: 1px solid #a7f3d0 !important; padding: 4px 10px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 11px !important; cursor: pointer !important;" class="hover:bg-emerald-50 shadow-2xs">${act.label}</button>`;
+                            const allowed = ['open_work_order', 'trigger_blue_patch', 'view_investigator_code', 'open_sentinel_modal', 'run_investigator', 'view_policies'];
+                            const action = allowed.includes(act.action) ? act.action : 'quick';
+                            return `<button data-aigis-action="${action}" data-value="${escapeHtml(act.label)}" style="background-color: #ffffff !important; color: #047857 !important; border: 1px solid #a7f3d0 !important; padding: 4px 10px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 11px !important; cursor: pointer !important;" class="hover:bg-emerald-50 shadow-2xs">${escapeHtml(act.label)}</button>`;
                         }).join("");
                         actionsCont.classList.remove("hidden");
                     } else {
@@ -7385,11 +8124,22 @@ ${sb.stderr}` : '');
         async function openSecOpsWorkOrderModal() {
             const m = document.getElementById("modal-secops-workorder");
             if (m) m.classList.remove("hidden");
+            currentWorkOrderTicket = null;
+            const status = document.getElementById('wo-request-status');
+            const button = document.getElementById('btn-deploy-workorder');
+            if (button) button.disabled = true;
+            refreshWorkOrderUI({ status: 'LOADING' });
+            inlineStatus(status, 'Loading draft from the current analysis…');
             try {
                 const res = await fetch(`${API_BASE}/api/v1/workorder/generate`);
                 const data = await res.json();
+                if (!data.ticket_id) throw new Error('No work-order draft was returned.');
                 refreshWorkOrderUI(data);
+                inlineStatus(status, 'Draft only. Previewing this plan does not deploy code or change production traffic.');
+                if (button) button.disabled = false;
             } catch (err) {
+                currentWorkOrderTicket = null;
+                inlineStatus(status, `Unable to load draft: ${err.message}`, openSecOpsWorkOrderModal);
                 console.warn("[Work Order] Failed to generate:", err);
             }
         }
@@ -7410,9 +8160,9 @@ ${sb.stderr}` : '');
             const thrEl = document.getElementById("wo-threat-class");
             const incEl = document.getElementById("wo-incident-ref");
 
-            if (tidEl) tidEl.textContent = ticket.ticket_id || "WO-2026-0814";
+            if (tidEl) tidEl.textContent = ticket.ticket_id || '—';
             if (stEl) {
-                stEl.textContent = ticket.status || "READY_FOR_CANARY";
+                stEl.textContent = ticket.status || 'NOT_ASSESSED';
                 stEl.className = (ticket.status === 'DEPLOYED_PRODUCTION')
                     ? "px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded"
                     : "px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded";
@@ -7420,56 +8170,59 @@ ${sb.stderr}` : '');
             if (srvEl) srvEl.textContent = ticket.target_service || "loyalty-checkout-service";
             if (epEl) epEl.textContent = ticket.target_endpoint || "/api/v1/voucher/claim";
             if (thrEl) thrEl.textContent = ticket.threat_classification || "TOCTOU_RACE_CONDITION";
-            if (incEl) incEl.textContent = ticket.incident_reference || "INC-2026-001";
+            if (incEl) incEl.textContent = ticket.incident_reference || 'Not available';
+            const created = document.getElementById('wo-created-at');
+            if (created) created.textContent = ticket.created_at ? `Created: ${ticket.created_at}` : '—';
+            const priority = document.getElementById('wo-priority');
+            if (priority) priority.textContent = ticket.priority || 'UNASSESSED';
 
             const qf = ticket.quantitative_findings || {};
             const gapEl = document.getElementById("wo-kpi-gap");
             const dirtyEl = document.getElementById("wo-kpi-dirty");
             const lossEl = document.getElementById("wo-kpi-loss");
 
-            if (gapEl) gapEl.textContent = qf.vulnerability_gap_ms === undefined ? "N/A" : `${Number(qf.vulnerability_gap_ms).toFixed(2)}ms`;
-            if (dirtyEl) dirtyEl.textContent = qf.dirty_read_rate_pct === undefined ? "N/A" : `${qf.dirty_read_rate_pct}%`;
-            if (lossEl) lossEl.textContent = qf.stolen_per_burst_usd === undefined ? "N/A" : `$${Number(qf.stolen_per_burst_usd).toLocaleString()}`;
+            if (gapEl) gapEl.textContent = qf.vulnerability_gap_ms == null ? "N/A" : `${Number(qf.vulnerability_gap_ms).toFixed(2)}ms`;
+            if (dirtyEl) dirtyEl.textContent = qf.dirty_read_rate_pct == null ? "N/A" : `${qf.dirty_read_rate_pct}%`;
+            if (lossEl) lossEl.textContent = qf.stolen_per_burst_usd == null ? "N/A" : `$${Number(qf.stolen_per_burst_usd).toLocaleString()}`;
+            const stages = document.getElementById('wo-canary-tbody');
+            if (stages) stages.innerHTML = (ticket.canary_rollout_matrix || []).map(stage => `<tr>
+                <td class="p-2">Stage ${escapeHtml(stage.stage)}</td>
+                <td class="p-2">${escapeHtml(stage.traffic_pct)}%</td>
+                <td class="p-2">${stage.window_minutes ? `${escapeHtml(stage.window_minutes)} minutes` : 'Continuous'}</td>
+                <td class="p-2">${escapeHtml(stage.health_gate)}</td>
+                <td class="p-2 text-right">${escapeHtml(stage.status)}</td></tr>`).join('');
+            const log = document.getElementById('wo-deployment-log');
+            if (log) { log.replaceChildren(); log.classList.add('hidden'); }
+            const summary = document.getElementById('wo-rollout-summary-pill');
+            if (summary) summary.textContent = ticket.status === 'SIMULATED_ROLLOUT_PREVIEW' ? 'Preview only · No stages executed' : 'Awaiting approval · Not executed';
         }
 
         async function deploySecOpsWorkOrder() {
             const btn = document.getElementById("btn-deploy-workorder");
-            if (btn) btn.textContent = "Deploying Canary Stages...";
+            if (!currentWorkOrderTicket?.ticket_id || btn?.disabled) return;
+            if (btn) { btn.textContent = 'Loading preview…'; btn.disabled = true; }
 
             try {
                 const res = await fetch(`${API_BASE}/api/v1/workorder/deploy`, { method: 'POST' });
                 const data = await res.json();
-
+                if (!data.success || !data.simulated || !data.ticket) throw new Error('No simulation preview was returned.');
+                refreshWorkOrderUI(data.ticket);
                 const log = document.getElementById("wo-deployment-log");
-                if (log) log.classList.remove("hidden");
-
-                const s1 = document.getElementById("wo-stage1-status");
-                const s2 = document.getElementById("wo-stage2-status");
-                const s3 = document.getElementById("wo-stage3-status");
-                const sumPill = document.getElementById("wo-rollout-summary-pill");
-
-                if (s1) s1.innerHTML = `<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">PASSED_VERIFIED</span>`;
-                if (s2) s2.innerHTML = `<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">PASSED_VERIFIED</span>`;
-                if (s3) s3.innerHTML = `<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">PASSED_VERIFIED</span>`;
-                if (sumPill) {
-                    sumPill.textContent = "100% Production Rollout Active (Zero Regression)";
-                    sumPill.className = "text-[10px] text-emerald-700 font-bold";
+                if (log) {
+                    log.classList.remove('hidden');
+                    log.textContent = Object.values(data.verification_summary || {}).filter(value => typeof value === 'string').join('\n');
                 }
-
-                const stBadge = document.getElementById("wo-status-badge");
-                if (stBadge) {
-                    stBadge.textContent = "DEPLOYED_PRODUCTION";
-                    stBadge.className = "px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded";
-                }
-
-                alert("SecOps Work Order successfully deployed to Production Staging! All 3 canary stages passed with zero regressions.");
+                notify('Canary simulation preview ready. No deployment was executed.');
             } catch (err) {
+                inlineStatus(document.getElementById('wo-request-status'), `Preview failed: ${err.message}`);
+                notify(`Preview failed: ${err.message}`, 'error');
                 console.error("[Work Order Deploy] Error:", err);
             } finally {
-                if (btn) btn.textContent = "1-Click Canary Rollout";
+                if (btn) { btn.textContent = 'Preview Canary Plan'; btn.disabled = false; }
             }
         }
 
+        initLiveStreamPoller();
     </script>
 </body>
 </html>

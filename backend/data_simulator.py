@@ -2,6 +2,7 @@ import os
 import json
 import time
 import random
+import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Any, Generator
 
@@ -67,13 +68,16 @@ def generate_million_row_dataset(
     attack_ratio: float = 0.035,
     burst_streams_size: int = 15,
     chunk_size: int = 50_000,
-    progress_callback = None
+    progress_callback = None,
+    seed: int | None = None
 ) -> Dict[str, Any]:
     """
     Tạo ra 1,000,000 dòng dữ liệu mô phỏng an ninh mạng & giao dịch tài chính cực kỳ chi tiết.
     Sử dụng cơ chế ghi đệm theo khối (Streaming Chunks) để tiết kiệm RAM và tốc độ cao (< 10s).
     """
     os.makedirs(DATASETS_DIR, exist_ok=True)
+    seed = secrets.randbits(32) if seed is None else seed
+    random = __import__('random').Random(seed)
     t_start = time.time()
 
     headers = [
@@ -85,7 +89,8 @@ def generate_million_row_dataset(
         "transaction_amount_usd", "status_code_unpatched", "status_code_patched", "is_attack", "attack_type"
     ]
 
-    base_time = datetime(2026, 10, 25, 12, 0, 0)
+    from datetime import timezone
+    base_time = datetime(2026, 10, 25, 12, 0, 0, tzinfo=timezone.utc)
     current_time_offset_ms = 0
 
     stats = {
@@ -103,7 +108,9 @@ def generate_million_row_dataset(
         "meta_path": os.path.relpath(META_PATH, PROJECT_ROOT),
         # attack_ratio is the probability that a *batch* is an attack burst; each burst
         # writes several rows, so the attack share of rows is much higher than attack_ratio.
-        "attack_ratio_param_per_batch": attack_ratio
+        "attack_ratio_param_per_batch": attack_ratio,
+        "seed": seed,
+        "generator_version": 1
     }
 
     sample_preview = []

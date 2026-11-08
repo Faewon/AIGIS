@@ -8,6 +8,7 @@ Các report dưới đây giữ kết quả của từng đợt kiểm tra. Test
 
 | Report | Trạng thái được ghi nhận | Cách tái hiện từ repository root |
 | :--- | :--- | :--- |
+| [Frontend improvements — 2026-11-08](frontend-improvements-2026-11-08.md) | Interaction fixes with Edge assertions for evidence, focus and stale responses | `python -m scratch.check_browser` |
 | [Project check — 2026-11-07](project-check-2026-11-07.md) | Findings gốc đã xử lý; mô tả access/CSP thuộc các giai đoạn cũ | `python -m scratch.check_project` |
 | [Project review — 2026-11-08](review-2026-11-08.md) | 5 findings đã xử lý | `python -m scratch.review_confirmations` |
 | [Follow-up review — 2026-11-08](followup-review-2026-11-08.md) | 4 findings đã xử lý | `python -m scratch.check_additional_findings` |
