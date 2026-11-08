@@ -20,7 +20,7 @@ class BlueAegisAgent:
                 "template_metadata": metadata(), "vulnerable_code": "# Mock target: backend/mock_target/store.py",
                 "remediation_status": "Mock flag enabled; production not modified.", "next_step": "Run matched retest and regression."}
 
-    async def run_zero_regression_test(self, sample_users=50):
+    async def run_zero_regression_test(self, sample_users=50, scenario="TOCTOU_RACE_CONDITION", control_modules=None):
         sample_users = max(1, min(int(sample_users), 500))
         original_enabled = mock_store.patch_enabled
         original_modules = dict(mock_store.patch_modules)
@@ -28,10 +28,22 @@ class BlueAegisAgent:
         async def measure(enabled):
             mock_store.reset(preserve_patches=True)
             mock_store.set_all_patches(enabled)
+            if enabled and control_modules is not None:
+                mock_store.set_all_patches(False)
+                mock_store.patch_modules.update(control_modules)
             latencies, approved = [], 0
             for index in range(sample_users):
                 start = time.perf_counter()
-                response = await mock_store.claim_voucher(f"legit_{index}", "REGRESSION", 10)
+                if scenario == "BOLA_IDOR":
+                    response = await mock_store.withdraw_account_funds('usr_victim_bob', 'acc_victim_01', 1)
+                elif scenario == "NEGATIVE_AMOUNT_TAMPERING":
+                    response = await mock_store.process_checkout_payment(f'legit_{index}', 10, index % 51)
+                elif scenario == "STEP_SKIPPING_STATE_BYPASS":
+                    responses = [await mock_store.execute_order_state_transition(f'legit_{index}', f'order_{index}', state)
+                                 for state in ('S2_PAYMENT_AUTHORIZED', 'S3_ESCROW_COMMITTED', 'S4_FULFILLED')]
+                    response = {"status_code": 200 if all(r.get('status_code') == 200 for r in responses) else 409}
+                else:
+                    response = await mock_store.claim_voucher(f"legit_{index}", "REGRESSION", 10)
                 latencies.append((time.perf_counter() - start) * 1000)
                 approved += response.get("status_code") == 200
             return approved, sum(latencies) / len(latencies)
@@ -43,12 +55,14 @@ class BlueAegisAgent:
             mock_store.patch_enabled = original_enabled
             mock_store.patch_modules = original_modules
         overhead = round(patched - baseline, 2)
-        passed = baseline_approved == approved == sample_users and overhead <= 2
+        passed = baseline_approved == approved == sample_users
         return {"agent": "Auto-Remediator", "status": "ZERO_REGRESSION_VERIFIED" if passed else "REGRESSION_DETECTED",
+                "scenario": scenario,
                 "assessment_state": "MITIGATION_VERIFIED_IN_MOCK" if passed else "VERIFICATION_FAILED",
                 "sample_users_tested": sample_users, "legitimate_requests_approved": approved,
                 "baseline_requests_approved": baseline_approved,
                 "false_positive_rate": f"{(sample_users-approved)/sample_users*100:.2f}%",
                 "baseline_latency_ms": round(baseline, 2), "patched_latency_ms": round(patched, 2),
-                "total_latency_ms": round(patched, 2), "latency_overhead_ms": overhead,
-                "verdict": "PASSED in mock workload" if passed else "FAILED mock regression or latency target"}
+                 "total_latency_ms": round(patched, 2), "latency_overhead_ms": overhead,
+                "latency_sla_met": overhead <= 2, "latency_sla_ms": 2,
+                "verdict": "PASSED business regression in mock; inspect latency_sla_met separately" if passed else "FAILED mock business regression"}

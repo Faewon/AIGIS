@@ -36,7 +36,7 @@
 > - "Applying a patch" flips feature flags on the mock target. Generated code is displayed for review only.
 > - Shadow-API discovery is regex-based, not an AST analysis.
 > - Scores, mitigation rates and losses are computed from the mock runs and labelled as demo heuristics. Compliance entries are demo mappings, not audit results.
-> - The telemetry dataset is synthetic. The DB and CSV are not committed (they exceed GitHub limits); generate them from the UI (`/api/v1/dataset/generate`, then `/api/v1/database/sync`).
+> - The bundled telemetry generator is synthetic. The DB and CSV are not committed (they exceed GitHub limits); generate them from the UI (`/api/v1/dataset/generate`, then `/api/v1/database/sync`). Optional PostgreSQL sources import authorized data into bounded, read-only snapshots; this does not enable attacks or patch deployment against remote services.
 
 ---
 
@@ -69,6 +69,9 @@ are scoped to the active database.
 | **Canary rollout** | Preview only; stages are marked `SIMULATED_PENDING_APPROVAL`. |
 | **Contextual stand-down** | Distinct-user ratio + proxy ratio heuristic, gated by the flash-sale policy's `active_from`/`active_to` window. |
 | **Incident memory** | SQLite table; new incidents are only recorded when collisions are actually measured. |
+| **PostgreSQL source** | Read-only discovery and bounded snapshot import; analysis uses local SQLite, not live remote SQL. |
+| **Durable mock benchmarks** | SQLite queue with progress, Cancel, heartbeat/lease and timeout; versioned manifest replay. |
+| **Temporal shadow signals** | On-demand timing analysis of up to 2,000 selected-dataset events; no automatic blocking. |
 
 ---
 
@@ -266,6 +269,42 @@ The server binds to `127.0.0.1` only. Every `/api/*` route requires an `X-AIGIS-
 python -m unittest discover -s tests -v
 ```
 
+### Optional PostgreSQL telemetry
+
+Install the optional driver in the server's Python environment:
+
+```bash
+python -m pip install -r requirements-postgres.txt
+```
+
+Configure `AIGIS_POSTGRES_MAIN` in the server environment with a PostgreSQL URI or
+libpq DSN for a dedicated read-only role. Do not put real credentials in Git,
+chat, logs or command history. `.env` files are not loaded automatically. Use
+verified TLS for remote servers. In **Telemetry Explorer → PostgreSQL source —
+read-only snapshot**, test the profile, choose schema/table and load or refresh.
+
+The import is capped at 100,000 rows / 50 MiB of converted field data. The UI
+discloses capture time and truncation. The SQL console and agents analyze a local
+SQLite snapshot, not live PostgreSQL; schema compatibility is still required.
+The demo stream, job queue and run history remain SQLite. See the
+[PostgreSQL setup and limitations](docs/postgresql.md).
+
+### Durable wargame benchmarks
+
+Use **Queue benchmark** on Wargame for durable submission/progress and **Cancel
+job** to request cancellation. Reloading the tab restores polling. Queue admission
+is limited to 20 pending/active jobs and one active queued benchmark; legacy
+synchronous routes are separate. Expired leases become `INTERRUPTED` or
+`TIMED_OUT`, not automatically retried. Training replay executes saved version-3
+manifests and rejects incompatible source versions. See
+[wargame execution and evidence](docs/wargame-improvements.md).
+
+Latest recorded local verification (before this documentation-only update):
+**85 tests discovered, 83 passed, 2 PostgreSQL integration tests skipped**;
+the full Edge browser suite passed. Skips do not verify real PostgreSQL
+connectivity. Re-run tests for the current checkout; see
+[verification commands](docs/postgresql.md#verification).
+
 ---
 
 ## REST API Specification
@@ -287,12 +326,21 @@ python -m unittest discover -s tests -v
 | `/api/v1/sentinel/policies` | `GET` | List contextual stand-down policies and promotional windows |
 | `/api/v1/sentinel/policies/toggle` | `POST` | Toggle active state of a specific contextual policy rule |
 | `/api/v1/database/table_data` | `GET` | Browse a selected database table with pagination |
+| `/api/v1/database/postgres/discover` | `POST` | Test a server-side PostgreSQL profile and list base tables, read-only |
+| `/api/v1/database/postgres/snapshot` | `POST` | Import a selected table into a bounded local snapshot |
 | `/api/v1/database/classify` | `POST` | Execute the 4-vector heuristic traffic classifier over telemetry |
 | `/api/v1/wargame/run_full` | `POST` | Run an isolated full mock workflow with optional seed |
 | `/api/v1/wargame/train` | `POST` | Run seeded multi-round mock training with paired evidence |
 | `/api/v1/wargame/recheck_multicycle` | `POST` | Run repeated mock verification cycles and persist the result |
 | `/api/v1/wargame/runs/{run_id}` | `GET` | Retrieve saved configuration and simulation evidence |
-| `/api/v1/wargame/runs/{run_id}/replay` | `POST` | Replay saved workload/control settings with the same seed |
+| `/api/v1/wargame/runs/{run_id}/replay` | `POST` | Replay compatible saved training manifests or recheck settings |
+| `/api/v1/wargame/runs` | `GET` | Bounded saved-run history |
+| `/api/v1/wargame/jobs` | `POST` | Submit a durable local benchmark (202) |
+| `/api/v1/wargame/jobs/{run_id}` | `GET` | Job status, heartbeat and saved run |
+| `/api/v1/wargame/jobs/{run_id}/cancel` | `POST` | Request queued/running job cancellation |
+| `/api/v1/wargame/controls/evaluate` | `POST` | Local mock control-ablation matrix |
+| `/api/v1/wargame/classifier/shadow` | `GET` | Read-only sampled temporal signals; no enforcement |
+| `/api/v1/wargame/classifier/evaluation` | `GET` | Separate synthetic row/temporal evaluation fixtures |
 
 This table highlights the main routes. Set `AIGIS_ENABLE_DOCS=1` before starting the server to expose request schemas and the complete route list at `http://127.0.0.1:8000/docs`; documentation endpoints are disabled by default. API calls require `X-AIGIS-Token`; the bundled dashboard supplies it automatically.
 

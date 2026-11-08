@@ -15,15 +15,16 @@ class SandboxRunnerAgent:
     4. STEP_SKIPPING_STATE_BYPASS
     """
 
-    async def execute_burst_attack(self, user_id: str = "usr_attacker_cerebrus_01", voucher_code: str = "TET2026_VIP", burst_count: int = 15, amount: float = 500.0) -> Dict[str, Any]:
+    async def execute_burst_attack(self, user_id: str = "usr_attacker_cerebrus_01", voucher_code: str = "TET2026_VIP", burst_count: int = 15, amount: float = 500.0, start_delays_ms=None) -> Dict[str, Any]:
         start_time = time.time()
         # Every run starts from a clean scenario while preserving the deployed patch state.
         mock_store.reset(preserve_patches=True)
 
-        tasks = [
-            mock_store.claim_voucher(user_id=user_id, voucher_code=voucher_code, amount=amount)
-            for _ in range(burst_count)
-        ]
+        async def claim(index):
+            if start_delays_ms:
+                await asyncio.sleep(start_delays_ms[index] / 1000)
+            return await mock_store.claim_voucher(user_id=user_id, voucher_code=voucher_code, amount=amount)
+        tasks = [claim(index) for index in range(burst_count)]
         
         responses = await asyncio.gather(*tasks)
         elapsed_ms = (time.time() - start_time) * 1000.0
@@ -80,7 +81,7 @@ class SandboxRunnerAgent:
             )
         }
 
-    async def execute_bola_attack(self, attacker_id: str = "usr_attacker_cerebrus_01") -> Dict[str, Any]:
+    async def execute_bola_attack(self, attacker_id: str = "usr_attacker_cerebrus_01", fixture_order=None) -> Dict[str, Any]:
         """Tấn công BOLA / IDOR trích xuất trái phép tài khoản người khác"""
         t0 = time.time()
         mock_store.reset(preserve_patches=True)
@@ -94,7 +95,7 @@ class SandboxRunnerAgent:
         blocked_count = 0
         success_count = 0
 
-        for t in targets:
+        for t in [targets[i] for i in (fixture_order or [0, 1])]:
             res = await mock_store.withdraw_account_funds(caller_id=attacker_id, target_account_id=t["account_id"], amount=t["amount"])
             if res["status_code"] == 200:
                 success_count += 1
@@ -126,7 +127,7 @@ class SandboxRunnerAgent:
             )
         }
 
-    async def execute_tamper_attack(self, attacker_id: str = "usr_attacker_cerebrus_01") -> Dict[str, Any]:
+    async def execute_tamper_attack(self, attacker_id: str = "usr_attacker_cerebrus_01", fixture_order=None) -> Dict[str, Any]:
         """Tấn công Negative Amount & Parameter Tampering"""
         t0 = time.time()
         mock_store.reset(preserve_patches=True)
@@ -140,7 +141,7 @@ class SandboxRunnerAgent:
         blocked_count = 0
         total_stolen = 0.0
 
-        for p in payloads:
+        for p in [payloads[i] for i in (fixture_order or [0, 1])]:
             res = await mock_store.process_checkout_payment(user_id=attacker_id, amount=p["amount"], discount_percent=p["discount"])
             if res["status_code"] == 200 and "EXPLOITED" in res.get("message", ""):
                 success_count += 1
@@ -175,12 +176,12 @@ class SandboxRunnerAgent:
             )
         }
 
-    async def execute_step_skipping_attack(self, attacker_id: str = "usr_attacker_cerebrus_01") -> Dict[str, Any]:
+    async def execute_step_skipping_attack(self, attacker_id: str = "usr_attacker_cerebrus_01", order_id=None) -> Dict[str, Any]:
         """Tấn công Step-Skipping & State Machine Inversion"""
         t0 = time.time()
         mock_store.reset(preserve_patches=True)
         logs = []
-        order_id = f"ORD-EXPLOIT-{int(time.time()*1000)%10000}"
+        order_id = order_id or f"ORD-EXPLOIT-{int(time.time()*1000)%10000}"
         
         # Thử nhảy cóc từ S1 thẳng sang S4 (Bỏ qua S2 thanh toán và S3 ký quỹ)
         res = await mock_store.execute_order_state_transition(user_id=attacker_id, order_id=order_id, target_state="S4_FULFILLED")
@@ -214,21 +215,26 @@ class SandboxRunnerAgent:
             )
         }
 
-    async def execute_scenario(self, scenario: str, burst_count: int = 15) -> Dict[str, Any]:
+    async def execute_scenario(self, scenario: str, burst_count: int = 15, workload=None) -> Dict[str, Any]:
         """Router điều phối kịch bản tấn công"""
+        # Apply the saved synthetic schedule to serial fixtures too. Payloads stay
+        # fixed and local; only the measured execution schedule is varied.
+        if workload and scenario != 'TOCTOU_RACE_CONDITION':
+            await asyncio.sleep(sum(workload['start_delays_ms']) / 1000)
         if scenario == "BOLA_IDOR":
-            report = await self.execute_bola_attack()
+            report = await self.execute_bola_attack(fixture_order=workload.get('fixture_order') if workload else None)
         elif scenario == "NEGATIVE_AMOUNT_TAMPERING":
-            report = await self.execute_tamper_attack()
+            report = await self.execute_tamper_attack(fixture_order=workload.get('fixture_order') if workload else None)
         elif scenario == "STEP_SKIPPING_STATE_BYPASS":
-            report = await self.execute_step_skipping_attack()
+            report = await self.execute_step_skipping_attack(order_id=workload.get('order_id') if workload else None)
         else:
-            report = await self.execute_burst_attack(burst_count=burst_count)
+            report = await self.execute_burst_attack(burst_count=burst_count,
+                start_delays_ms=workload.get("start_delays_ms") if workload else None)
         context = current_run()
         if context:
             report["evidence"] = SimulationEvidence(
                 run_id=context["run_id"], seed=context["seed"], scenario=report["scenario"],
-                workload_id=f"{report['scenario']}:{report['total_requests']}",
+                workload_id=workload["hash"] if workload else f"{report['scenario']}:{report['total_requests']}",
                 phase="retest" if mock_store.patch_enabled else "attack",
                 controls={"patch_enabled": mock_store.patch_enabled, **mock_store.patch_modules}).model_dump()
         report["assessment_state"] = ("EXPLOIT_REPRODUCED_IN_MOCK" if report["is_vulnerable"] else

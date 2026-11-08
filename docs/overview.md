@@ -1,12 +1,12 @@
 # AIGIS — Bản Tóm Tắt Dự Án (One-Pager)
-> Status: Current · Updated: 2026-11-08 · Scope: Local simulation
+> Status: Current · Updated: 2026-11-09 · Scope: Local simulation and read-only data sources
 >
 > [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Demo](demo.md)
 
 **AIGIS: Adversarial Intelligence for Generative Immunity & Security**
 
 > [!IMPORTANT]
-> **Phạm vi:** AIGIS là **proof-of-concept (bản mô phỏng)**. Mọi đòn tấn công, bản vá và kiểm thử lại đều chạy trên một **mock target trong cùng tiến trình** (`backend/mock_target/store.py`) với dữ liệu giả lập. Hiện chưa thể trỏ AIGIS vào một hệ thống thật. Chi tiết giới hạn xem [README](../README.md) mục *Scope & limitations*.
+> **Phạm vi:** AIGIS là **proof-of-concept (bản mô phỏng)**. Mọi đòn tấn công, bản vá và kiểm thử lại đều chạy trên **mock target trong cùng tiến trình** (`backend/mock_target/store.py`). Telemetry có thể là dữ liệu tổng hợp, file được phép sử dụng hoặc snapshot PostgreSQL chỉ đọc; kết nối nguồn dữ liệu không có nghĩa là kiểm thử tấn công/deploy bản vá lên hệ thống thật. Chi tiết giới hạn xem [README](../README.md) mục *Scope & limitations*.
 
 > **Tên gọi:**
 > * **A** — **A**dversarial *(Tác chiến đối kháng / Red Teaming)*
@@ -68,6 +68,9 @@ Ngoài ra: **FinTech Sentinel** (theo dõi TPS, lọc flash sale hợp lệ), **
 - [x] Dashboard một trang (`frontend/index.html`), Copilot hỏi đáp, NL-to-SQL, bộ phân loại traffic.
 - [x] API có token, chỉ bind `127.0.0.1`, có bộ test hồi quy bảo mật.
 - [x] Evidence gắn với dataset/run; full workflow có mock store riêng, seed, lưu kết quả và replay. Xem [kiến trúc](architecture.md#6-evidence-isolation-và-replay).
+- [x] Durable benchmark queue, Cancel, heartbeat/lease và timeout; replay trực tiếp manifest training v3 tương thích. Xem [wargame](wargame-improvements.md).
+- [x] Nguồn [PostgreSQL chỉ đọc](postgresql.md): chọn schema/table và nhập snapshot có giới hạn để phân tích SQLite; không phải live synchronization.
+- [x] Temporal shadow theo yêu cầu, không tự chặn; fixture đánh giá công khai giới hạn false positive và low-rate/distributed signals.
 - [ ] Gửi HTTP đồng thời thật vào một service mục tiêu riêng.
 - [ ] Tạo PR thật qua GitHub API.
 - [ ] Dữ liệu và tỷ lệ gian lận sát thực tế ngân hàng.

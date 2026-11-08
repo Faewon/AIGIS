@@ -1,5 +1,5 @@
 # AIGIS — Kịch Bản Demo 3 Phút
-> Status: Current · Updated: 2026-11-08 · Scope: Local simulation
+> Status: Current · Updated: 2026-11-09 · Scope: Local simulation with optional read-only data snapshots
 >
 > [Mục lục](README.md) · [Kiến trúc](architecture.md)
 
@@ -22,8 +22,15 @@
 2. Dùng offline heuristic provider nếu không cần trình diễn LLM; xác nhận cấu hình agent trước khi bấm chạy. Dashboard tự gửi API token, không yêu cầu đăng nhập.
 3. Nếu trình diễn Data/Sentinel/Investigator, chuẩn bị telemetry bằng UI: generate dataset rồi sync database. Wargame trên mock store không đòi hỏi dataset một triệu dòng.
 4. Chọn cùng cấu hình cho các lần tập: ví dụ 1 round, 15 burst streams. Khi chạy qua API, có thể gửi `seed: 42` vào `/api/v1/wargame/run_full`; không giả định UI có ô seed. Seed không cố định latency hoặc ID.
-5. Về màn hình Wargame, kiểm tra target đã reset và không có phiên stage-by-stage khác đang dùng chung trạng thái. Tập một lượt để xác nhận nhãn nút và kết quả trên phiên bản UI đang dùng.
+5. Về màn hình Wargame, kiểm tra target đã reset. UI cô lập trạng thái stage theo tab; API legacy thiếu header session vẫn dùng trạng thái chung. Tập một lượt để xác nhận nhãn nút và kết quả trên phiên bản UI đang dùng.
 6. Khi trình bày, đọc số liệu của lần chạy thực tế. Nếu lỗi hoặc thiếu dữ liệu, hiển thị trạng thái đó và chạy lại sau khi kiểm tra cấu hình.
+
+### Phần mở rộng tùy chọn (ngoài demo 3 phút)
+
+- **Queue benchmark / Cancel job:** minh họa nhận job, polling, hủy và lịch sử. Chỉ job `COMPLETED` có kết quả tương thích mới được trình bày là đã kiểm chứng trong mock. Hủy, timeout hay gián đoạn không phải pass.
+- **History / Replay:** replay training dùng manifest v3 đã lưu và kiểm tra source version; 409 khi code không tương thích là hành vi mong đợi, không cố bỏ kiểm tra để demo chạy.
+- **PostgreSQL:** chuẩn bị trước driver/profile chỉ đọc theo [hướng dẫn](postgresql.md). Test connection → chọn schema/table → Load / refresh snapshot. Chỉ rõ capture time, truncation và việc SQL console phân tích SQLite snapshot, không phải live PostgreSQL. Không chiếu password/DSN lên màn hình. Không có server test thì bỏ phần này, không giả lập kết quả kết nối thành công.
+- **Temporal shadow:** nhấn Inspect temporal shadow signals; giải thích đây là tín hiệu thời gian từ mẫu tối đa 2.000 event, không chặn giao dịch hay chứng minh có gian lận. Chỉ số trên snapshot không đại diện toàn bộ nguồn remote.
 
 ## Timeline
 
@@ -102,7 +109,8 @@ timeline
 
 | Câu hỏi | Trả lời trung thực |
 | :--- | :--- |
-| Có chạy được trên hệ thống thật không? | Chưa. Hiện chỉ chạy trên mock target trong tiến trình. |
+| Có chạy được trên hệ thống thật không? | Tấn công/vá/retest chỉ ở mock. Có thể đọc nguồn PostgreSQL được cấp phép thành snapshot local; không tấn công hay deploy lên nguồn đó. |
+| PostgreSQL có live không? | Không. Refresh thủ công, giới hạn 100.000 dòng / 50 MiB dữ liệu chuyển đổi; phân tích SQLite snapshot. |
 | Có dùng HTTP/2 single-packet thật không? | Chưa. Hiện là coroutine đồng thời, không có network I/O. |
 | Bản vá có được tự động deploy không? | Không. Mã vá là mẫu để review; trên mock chỉ bật cờ khóa. |
 | PR có được tạo trên GitHub không? | Không, là nội dung PR mô phỏng. |

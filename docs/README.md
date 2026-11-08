@@ -1,6 +1,6 @@
 # AIGIS Documentation
 
-> Status: Current navigation · Updated: 2026-11-08 · Scope: Local simulation
+> Status: Current navigation · Updated: 2026-11-09 · Scope: Local simulation and read-only data sources
 
 [Project README](../README.md) là điểm bắt đầu để cài đặt và chạy AIGIS. Các tài liệu dưới đây đi sâu theo mục đích đọc.
 
@@ -12,10 +12,18 @@
 | Cài đặt và chạy | [Quick Start](../README.md#quick-start-guide) |
 | Chuẩn bị thuyết trình | [Demo: chuẩn bị, thao tác, lời thoại](demo.md) |
 | Hiểu cách backend hoạt động | [Architecture](architecture.md) → [Backend reliability](backend-reliability.md) |
+| Kiểm chứng wargame và giới hạn | [Wargame improvements](wargame-improvements.md) |
+| Kết nối nguồn PostgreSQL | [PostgreSQL read-only snapshots](postgresql.md) |
 | Chỉnh giao diện | [Design system](design-system.md) và [frontend check](reports/frontend-check.md) |
 | Tra cứu các đợt kiểm tra | [Report index](reports/README.md) |
 
 ## Vai trò và nguồn thông tin
+
+### Cập nhật hiện hành
+
+- PostgreSQL là **nguồn chỉ đọc → snapshot SQLite có giới hạn**, không phải thay database runtime hay kết nối phân tích live. Cài driver/profile và xem giới hạn tại [PostgreSQL](postgresql.md).
+- Wargame có durable queue/Cancel/heartbeat, history, manifest replay v3 và temporal shadow không chặn. Chi tiết ở [Wargame improvements](wargame-improvements.md).
+- Kết quả kiểm chứng gần nhất được ghi nhận trước lần cập nhật tài liệu này: 85 test, 83 đạt / 2 PostgreSQL integration skip; browser suite tổng đạt. Không diễn giải skip thành xác nhận PostgreSQL thật. Xem [Backend reliability](backend-reliability.md#commands).
 
 - **README gốc:** giới thiệu, quick start, feature grid và API overview.
 - **Overview:** bản tóm tắt tiếng Việt; không thay thế đặc tả kỹ thuật.

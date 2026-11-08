@@ -124,12 +124,14 @@ def get_active_db_info() -> Dict[str, Any]:
     global ACTIVE_DB_PATH, ACTIVE_DB_NAME
     size_mb = round(os.path.getsize(ACTIVE_DB_PATH) / (1024 * 1024), 2) if os.path.exists(ACTIVE_DB_PATH) else 0.0
     tables = get_db_tables()
+    from backend.postgres_source import active_metadata
     return {
         "active_db_path": ACTIVE_DB_PATH,
         "active_db_name": ACTIVE_DB_NAME,
         "size_mb": size_mb,
         "tables": tables,
-        "connected": os.path.exists(ACTIVE_DB_PATH)
+        "connected": os.path.exists(ACTIVE_DB_PATH),
+        **active_metadata(ACTIVE_DB_PATH)
     }
 
 def get_db_tables(custom_path: Optional[str] = None) -> List[str]:

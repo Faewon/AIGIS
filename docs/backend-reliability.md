@@ -1,5 +1,5 @@
 # Backend reliability improvements
-> Status: Current implementation reference · Updated: 2026-11-08 · Scope: Local/offline checks
+> Status: Current implementation reference · Updated: 2026-11-09 · Scope: Local/offline checks and optional read-only PostgreSQL sources
 >
 > [Documentation index](README.md) · [Architecture](architecture.md) · [Review history](reports/README.md)
 
@@ -43,17 +43,24 @@ structured events, and repeatable operational checks.
 - Full workflows/training use task-local mock stores. Parallel runs do not reset
   the shared target or each other's stores. Scope exit restores state after
   errors/cancellation.
-- Legacy step-by-step target mutations remain a serialized single shared session.
-  Use full runs for independent concurrent experiments. The API should be run in
-  one worker while using the legacy shared session.
+- Browser step sessions use `X-AIGIS-Wargame-Session` and independent in-memory
+  stores (one-hour expiry, 100-session cap). Headerless legacy callers retain a
+  serialized shared session; use one API worker for that legacy path.
 - Completed training and HTTP recheck results/configurations are saved to
   `backend/datasets/aigis_runs.db` (override with `AIGIS_RUN_DB`).
 - POST `/api/v1/wargame/run_full` or `/api/v1/wargame/train` accepts `seed`.
 - GET `/api/v1/wargame/runs/{run_id}` retrieves evidence and configuration.
-- POST `/api/v1/wargame/runs/{run_id}/replay` replays stored workload/control
-  settings with the same seed and produces a new manifest.
-- Replay reproduces scenario configuration and functional outcomes, not exact
-  wall-clock latency or generated IDs. Failed operations emit structured events.
+- POST `/api/v1/wargame/runs/{run_id}/replay` executes saved version-3 training
+  manifests directly, validating integrity and source/schema/scenario/control
+  compatibility. Old/incompatible versions return 409; history stays readable.
+  Recheck replay separately restores saved control settings and seed.
+- Replay does not promise exact wall-clock timing. Seeded fixture ordering and
+  order IDs add variation, but monetary/state boundary fixtures remain canonical.
+  Failed operations emit structured events and preserve partial saved evidence.
+- Durable SQLite jobs support bounded admission, atomic claims, Cancel,
+  heartbeat/lease, timeout and interrupted recovery without automatic retry.
+  Queue limits do not apply to the legacy synchronous routes. See
+  [execution details](wargame-improvements.md#durable-execution-and-replay).
 - Dataset generation uses a local seeded RNG, records its effective seed and
   generator version, and uses a UTC baseline for cross-timezone reproducibility.
 
@@ -67,6 +74,31 @@ remain necessary. Redis acquisition failure returns 503. Release uses owner-toke
 comparison; protocol-double tests check spoofed headers, missing identity,
 concurrent claims, and unavailable Redis. Java/Go/edge outputs remain reference
 templates and are not compiler/runtime-validated here.
+
+### PostgreSQL telemetry snapshots
+
+- Optional `requirements-postgres.txt` installs `psycopg`. Server environment
+  profiles provide credentials; API/browser receive only opaque source IDs and
+  table metadata. Driver error details are not returned to clients.
+- Read-only repeatable-read transactions discover base tables and stream a bounded
+  snapshot. Connection/statement/lock timeouts are 5s/10s/2s respectively.
+- Analysis remains SQLite: a selected table becomes local `telemetry`, capped at
+  100,000 rows / 50 MiB converted data. No arbitrary remote SQL or remote writes.
+- Failed import keeps the old dataset; successful imports disclose capture time,
+  truncation and snapshot ID. Scan order is not guaranteed recent/deterministic.
+  Provenance is in-memory; snapshot files persist and require data-retention care.
+- This is not continuous synchronization or a production PostgreSQL migration.
+  Schema compatibility still gates diagnosis/classification. See
+  [setup, security and limits](postgresql.md).
+
+### Business regression and temporal shadow
+
+- Each mock scenario checks legitimate business behavior separately from latency
+  SLA; reject-all controls cannot receive a business-regression pass.
+- Control ablation covers absent/relevant/all/no-op/reject-all configurations.
+- Temporal shadow is on-demand, bounded to 2,000 events, read-only and non-enforcing.
+  Synthetic holdout sequences disclose legitimate-retry false positives and
+  low-rate/distributed blind spots, not real-world accuracy.
 
 ### Telemetry performance
 
@@ -117,6 +149,14 @@ those details alongside output when comparing a new run.
 
 ## Commands
 
+Latest recorded implementation check before this documentation-only update:
+**85 tests discovered: 83 passed, 2 PostgreSQL integration tests skipped**. The
+full Edge browser suite passed, including Model responsive checks, durable job
+polling, shadow labels and safe failure of unconfigured PostgreSQL profiles.
+The skip means no real PostgreSQL connectivity was established; mocked connector
+tests are not integration certification. These results are separate from the
+older measurements below and are not a fresh run caused by editing this document.
+
 Verification completed locally: full regression suite **60 tests passed**;
 the subsequently added recheck HTTP persistence/replay test also passed in the
 targeted API suite (**2 tests passed**). Extended integration reported **zero
@@ -130,6 +170,8 @@ checkout; earlier report counts describe earlier snapshots.
 
 ```powershell
 python -m unittest discover -s tests -v
+python -m unittest tests.test_postgres_source -v
+python -m scratch.check_browser
 python -m scratch.check_project
 python -m scratch.review_confirmations
 python -m scratch.check_additional_findings

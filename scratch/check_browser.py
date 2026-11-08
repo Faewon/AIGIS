@@ -20,6 +20,7 @@ def run():
     server.global_llm_engine.configure('heuristic')
     with tempfile.TemporaryDirectory(prefix='aigis_browser_') as directory, ExitStack() as stack:
         root = Path(directory)
+        stack.enter_context(patch.dict(os.environ, {'AIGIS_RUN_DB': str(root / 'runs.db')}))
         for key, value in {'DATASETS_DIR': directory, 'UPLOADS_DIR': str(root / 'uploads'), 'DB_PATH': str(root / 'test.db'), 'ACTIVE_DB_PATH': str(root / 'test.db')}.items():
             stack.enter_context(patch.object(database, key, value))
         stack.enter_context(patch.object(server, 'BASE_DIR', directory))
@@ -164,7 +165,42 @@ def run():
             assert evaluate("document.getElementById('pii-results-container')?.textContent.includes('not a compliance assessment') || document.getElementById('modal-pii-scanner').textContent.includes('not a compliance assessment')"), 'Clean scan must not claim compliance'
             evaluate("closePiiScannerModal(); switchPowerBiView('data')")
             print('IMPROVEMENTS: work-order evidence, modal focus/Escape, HTTP errors, stale-response guard, and PII copy passed')
+            # Real browser verification of the wargame workflow and stale-result clearing.
+            evaluate("switchPowerBiView('wargame'); tweakConfig.adversarialRounds=2; tweakConfig.burstStreams=3; const previousNotify=notify; notify=(message,type)=>{window.lastNotification=message;previousNotify(message,type)}")
+            evaluate('runFullWargame()')
+            assert evaluate("document.getElementById('wargame-assessment').textContent.includes('PASSED IN MOCK')"), str(evaluate("({error:window.lastNotification,assessment:document.getElementById('wargame-assessment').textContent,evidence:document.getElementById('wargame-evidence').textContent,log:document.getElementById('logs-verification').textContent})"))
+            assert evaluate("document.getElementById('wargame-evidence').textContent.includes('Baseline illegal:')"), 'Evidence must expose measured baseline'
+            evaluate('loadWargameHistory()')
+            assert evaluate("document.getElementById('wargame-history').textContent.includes('COMPLETED')"), 'History must show completed runs'
+            evaluate('runMultiCycleStressRecheck(5)')
+            assert evaluate("document.getElementById('wargame-assessment').textContent.includes('CYCLE CHECK PASSED')"), 'Five cycle recheck must be scoped'
+            evaluate('runMultiCycleStressRecheck(10)')
+            assert evaluate("document.getElementById('wargame-assessment').textContent.includes('CYCLE CHECK PASSED')"), 'Ten cycle recheck must be scoped'
+            evaluate('resetSimulation()')
+            assert evaluate("document.getElementById('wargame-assessment').textContent === 'NOT ASSESSED'"), 'Reset must clear verification'
+            evaluate("(async () => { tweakConfig.adversarialRounds=1; await runStage3(); await runStage4(); await runStage5(); await runStage6(); })()")
+            assert evaluate("document.getElementById('wargame-assessment').textContent.includes('PASSED IN MOCK')"), 'Single-stage workflow must render verified evidence'
+            evaluate("""(async () => {
+                const original = window.fetch;
+                window.fetch = async () => { throw new Error('Injected browser network failure'); };
+                try { await runStage5(); } catch (_) {} finally { window.fetch = original; }
+            })()""")
+            assert evaluate("document.getElementById('wargame-assessment').textContent.includes('INCONCLUSIVE') && document.getElementById('retest-mitigation').textContent==='N/A'"), 'Request failure must clear previous green results'
+            print('WARGAME: full run, stages, 5/10 cycles, history, reset and network failure passed')
+            evaluate('startDurableBenchmark()')
+            assert evaluate("document.getElementById('wargame-job-status').textContent.includes('COMPLETED')"), 'Durable benchmark must complete through polling'
+            evaluate('loadTemporalShadow()')
+            assert evaluate("document.getElementById('temporal-shadow-results').textContent.includes('SHADOW ONLY')"), 'Shadow signals must be explicitly non-enforcing'
+            print('DURABLE JOB + SHADOW: browser polling and read-only signal inspection passed')
+            evaluate("document.getElementById('postgres-profile').value='AIGIS_POSTGRES_UNCONFIGURED_BROWSER_CHECK'; discoverPostgresSource()")
+            assert evaluate("!document.getElementById('postgres-discover').disabled && document.getElementById('postgres-snapshot').disabled"), 'Failed PostgreSQL discovery must leave retry enabled and import disabled'
+            assert evaluate("document.getElementById('postgres-source-status').textContent.includes('Invalid or unavailable')"), 'Unconfigured PostgreSQL profile must fail safely'
+            print('POSTGRES UI: unconfigured profile fails safely without replacing the dataset')
+            import sys
+            if '--wargame-only' in sys.argv:
+                return
             evaluate("switchPowerBiView('model')")
+            evaluate("document.getElementById('model-properties').scrollIntoView({block:'center',inline:'nearest'})")
             time.sleep(.3)
             print('MODEL GEOMETRY', json.dumps(evaluate("""(() => {
                 const ids=['cell0-model-view','model-canvas-wrapper','model-zoom-container','model-nodes-container','model-properties'];
@@ -174,7 +210,9 @@ def run():
             assert evaluate("getComputedStyle(document.getElementById('model-zoom-container')).transformOrigin === '0px 0px'"), 'Zoom must use top-left coordinates'
             assert evaluate("""(() => {
                 const pane=document.getElementById('model-properties'), r=pane.getBoundingClientRect();
-                return pane.contains(document.elementFromPoint(r.left+15,r.top+30));
+                const x=Math.max(0,r.left)+15;
+                const top=Math.max(0,r.top), bottom=Math.min(window.innerHeight,r.bottom);
+                return bottom>top && pane.contains(document.elementFromPoint(x,(top+bottom)/2));
             })()"""), 'Cards must not paint over properties'
             assert evaluate("document.querySelectorAll('.model-column').length > 29"), 'Model must expose all columns'
             point = evaluate("(() => {const header=document.querySelector('.model-table-header'); header.scrollIntoView({block:'center',inline:'center'}); const box=header.getBoundingClientRect(); return {x:box.left+40,y:box.top+12,old:powerBiModelCache.tables[0].x};})()")

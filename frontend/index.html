@@ -602,7 +602,7 @@ button:disabled { cursor: wait; opacity: .6; }
     --ink: #0f172a;
     --body: #334155;
     --muted: #64748b;
-    --faint: #94a3b8;
+    --faint: #59697e;
     --border: #e2e8f0;
     --rule: #f1f5f9;
     --ground: #f8fafc;
@@ -1196,6 +1196,124 @@ button:disabled { cursor: wait; opacity: .6; }
 .pbi-rail-btn-inactive:hover {
     background-color: #ffffff !important;
     color: #201f1e !important;
+}
+
+/* Offline color utilities: keep markup and dynamically rendered states visible. */
+.bg-transparent { background-color: transparent; }
+.border-none { border: 0; }
+.border-b-2 { border-bottom-width: 2px; border-bottom-style: solid; }
+.border-l-3 { border-left-width: 3px; border-left-style: solid; }
+.border-l-4 { border-left-width: 4px; border-left-style: solid; }
+.bg-slate-50 { background-color: #f8fafc; }
+.bg-slate-50\/50 { background-color: rgba(248, 250, 252, 0.5); }
+.bg-slate-100 { background-color: #f1f5f9; }
+.bg-slate-400 { background-color: #94a3b8; }
+.bg-slate-700 { background-color: #334155; }
+.bg-slate-900 { background-color: #0f172a; }
+.bg-slate-950 { background-color: #020617; color: #e2e8f0; }
+.bg-emerald-100 { background-color: #d1fae5; }
+.bg-emerald-200 { background-color: #a7f3d0; }
+.bg-emerald-400 { background-color: #34d399; }
+.bg-emerald-500 { background-color: #10b981; }
+.bg-emerald-600 { background-color: #059669; }
+.bg-emerald-950\/60 { background-color: rgba(2, 44, 34, 0.6); }
+.bg-amber-400 { background-color: #fbbf24; }
+.bg-amber-500 { background-color: #f59e0b; }
+.bg-amber-950\/70 { background-color: rgba(69, 26, 3, 0.7); }
+.bg-rose-400 { background-color: #fb7185; }
+.bg-rose-950\/80 { background-color: rgba(76, 5, 25, 0.8); }
+.bg-purple-400 { background-color: #c084fc; }
+.bg-purple-950\/70 { background-color: rgba(59, 7, 100, 0.7); }
+.bg-indigo-50\/50 { background-color: rgba(238, 242, 255, 0.5); }
+.bg-sky-50 { background-color: #f0f9ff; }
+.bg-sky-100 { background-color: #e0f2fe; }
+.bg-orange-50 { background-color: #fff7ed; }
+.bg-teal-100 { background-color: #ccfbf1; }
+.text-slate-200 { color: #e2e8f0; }
+.text-slate-300 { color: #cbd5e1; }
+.text-amber-300 { color: #fcd34d; }
+.text-amber-500 { color: #f59e0b; }
+.text-amber-600 { color: #d97706; }
+.text-blue-700 { color: #1d4ed8; }
+.text-cyan-200\/90 { color: rgba(165, 243, 252, 0.9); }
+.text-emerald-500 { color: #10b981; }
+.text-emerald-800 { color: #065f46; }
+.text-emerald-900 { color: #064e3b; }
+.text-emerald-900\/90 { color: rgba(6, 78, 59, 0.9); }
+.text-emerald-950 { color: #022c22; }
+.text-orange-900 { color: #7c2d12; }
+.text-purple-300 { color: #d8b4fe; }
+.text-purple-950 { color: #3b0764; }
+.text-rose-300 { color: #fda4af; }
+.text-rose-500 { color: #f43f5e; }
+.text-rose-900\/90 { color: rgba(136, 19, 55, 0.9); }
+.text-sky-200\/90 { color: rgba(186, 230, 253, 0.9); }
+.text-sky-500 { color: #0ea5e9; }
+.text-sky-800 { color: #075985; }
+.text-teal-800 { color: #115e59; }
+.border-slate-300 { border-color: #cbd5e1; }
+.border-slate-400 { border-color: #94a3b8; }
+.border-slate-500 { border-color: #64748b; }
+.border-slate-700 { border-color: #334155; }
+.border-slate-800 { border-color: #1e293b; }
+.border-gray-900 { border-color: #111827; }
+.border-emerald-200 { border-color: #a7f3d0; }
+.border-emerald-300 { border-color: #6ee7b7; }
+.border-emerald-400 { border-color: #34d399; }
+.border-emerald-500 { border-color: #10b981; }
+.border-emerald-600 { border-color: #059669; }
+.border-emerald-800 { border-color: #065f46; }
+.border-emerald-800\/60 { border-color: rgba(6, 95, 70, 0.6); }
+.border-amber-400 { border-color: #fbbf24; }
+.border-amber-500 { border-color: #f59e0b; }
+.border-indigo-500 { border-color: #6366f1; }
+.border-orange-300 { border-color: #fdba74; }
+.border-purple-400 { border-color: #c084fc; }
+.border-purple-500 { border-color: #a855f7; }
+.border-rose-500 { border-color: #f43f5e; }
+.border-rose-600 { border-color: #e11d48; }
+.border-rose-700 { border-color: #be123c; }
+.border-rose-800 { border-color: #9f1239; }
+.border-rose-800\/60 { border-color: rgba(159, 18, 57, 0.6); }
+.border-sky-200 { border-color: #bae6fd; }
+.border-sky-300 { border-color: #7dd3fc; }
+.border-teal-500 { border-color: #14b8a6; }
+.hover\:bg-slate-50:hover { background-color: #f8fafc; }
+.hover\:bg-slate-200:hover { background-color: #e2e8f0; }
+.hover\:bg-gray-50:hover { background-color: #f9fafb; }
+.hover\:bg-gray-300:hover { background-color: #d1d5db; }
+.hover\:bg-black:hover { background-color: #000; }
+.hover\:bg-emerald-50:hover { background-color: #ecfdf5; }
+.hover\:bg-emerald-100:hover { background-color: #d1fae5; }
+.hover\:bg-emerald-700:hover { background-color: #047857; }
+.hover\:bg-emerald-900\/80:hover { background-color: rgba(6, 78, 59, 0.8); }
+.hover\:bg-amber-100:hover { background-color: #fef3c7; }
+.hover\:bg-amber-900\/80:hover { background-color: rgba(120, 53, 15, 0.8); }
+.hover\:bg-purple-100:hover { background-color: #f3e8ff; }
+.hover\:bg-purple-900\/80:hover { background-color: rgba(88, 28, 135, 0.8); }
+.hover\:bg-rose-50:hover { background-color: #fff1f2; }
+.hover\:bg-rose-100:hover { background-color: #ffe4e6; }
+.hover\:bg-rose-600:hover { background-color: #e11d48; }
+.hover\:bg-rose-900:hover { background-color: #881337; }
+.hover\:bg-sky-100:hover { background-color: #e0f2fe; }
+.hover\:text-gray-800:hover { color: #1f2937; }
+.hover\:text-gray-900:hover { color: #111827; }
+.hover\:text-slate-700:hover { color: #334155; }
+.hover\:text-white:hover { color: #fff; }
+.focus\:bg-white:focus { background-color: #fff; }
+.placeholder-slate-500::placeholder { color: #64748b; opacity: 1; }
+
+/* Secondary copy must remain readable on the light workspace. */
+.text-gray-400, .text-slate-400 { color: #59697e; }
+.pbi-title-bar .text-gray-400,
+.pbi-title-bar .text-slate-400 { color: #cbd5e1; }
+.pbi-title-bar input::placeholder { color: #cbd5e1; opacity: 1; }
+input:not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+textarea, select { border-color: var(--ctl); }
+button:focus-visible, a:focus-visible,
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--p);
+    outline-offset: 2px;
 }
 
 </style>
@@ -2264,6 +2382,21 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
             <!-- (Dedicated separate page containing KPIs, ReAct Track & Cells 0 - 6)      -->
             <!-- ========================================================================= -->
             <div id="pbi-page-wargame" class="hidden min-w-0">
+                <section class="p-4 bg-white border border-gray-200" aria-labelledby="wargame-evidence-title">
+                    <h2 id="wargame-evidence-title" class="font-bold text-gray-900">LOCAL MOCK / SYNTHETIC DATA</h2>
+                    <p class="text-xs text-gray-600">Baseline → Control → Retest → Legitimate regression → Evidence. Demo scores are heuristic, not production certification.</p>
+                    <p id="wargame-assessment" role="status" aria-live="polite">NOT ASSESSED</p>
+                    <div id="wargame-evidence" class="text-xs text-gray-700"></div>
+                    <button type="button" onclick="loadWargameHistory()" class="pbi-btn-green px-3 py-1">Refresh run history</button>
+                    <button type="button" id="wargame-job-start" onclick="startDurableBenchmark()" class="px-3 py-1">Queue benchmark</button>
+                    <button type="button" id="wargame-job-cancel" onclick="cancelDurableBenchmark()" disabled class="px-3 py-1">Cancel job</button>
+                    <p id="wargame-job-status" role="status" aria-live="polite">No queued benchmark.</p>
+                    <button type="button" onclick="loadTemporalShadow()" class="px-3 py-1">Inspect temporal shadow signals</button>
+                    <p id="temporal-shadow-results" class="text-xs"></p>
+                    <button type="button" onclick="runControlEvaluation()" class="px-3 py-1">Evaluate control matrix</button>
+                    <pre id="wargame-control-results" class="text-xs overflow-x-auto"></pre>
+                    <div id="wargame-history" class="text-xs text-gray-700"></div>
+                </section>
                 <div class="flex-1 min-w-0 overflow-y-auto px-2 py-4 flex gap-6">
 
         <!-- ===================================================================== -->
@@ -2438,7 +2571,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 <div class="sp-kpi">
                     <div class="kpi-label">
                         <span>Security Posture</span>
-                        <span class="sp-pill sp-p-ok text-[10px]">IMMUNE</span>
+                        <span class="sp-pill text-[10px]">MOCK VERIFICATION</span>
                     </div>
                     <div class="kpi-value text-emerald-700">32 &rarr; 99 <span class="text-xs font-normal text-slate-400">/ 100</span></div>
                     <div class="kpi-sub">Red ELO 1500 &bull; Blue ELO 1680 (Equilibrium)</div>
@@ -2512,6 +2645,16 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
 
                 <!-- Cell 0: Telemetry Explorer & Forensics Ingest -->
                 <section data-dashboard-controls="explorer" id="cell-0"  class="kernel-cell p-5 space-y-3.5">
+                <details class="border border-gray-200 p-3 text-xs" id="postgres-source-panel">
+                    <summary class="cursor-pointer font-bold">PostgreSQL source — read-only snapshot</summary>
+                    <p class="my-2">Uses a server-side profile. No password is entered here. Analysis runs on a bounded SQLite snapshot, not a live PostgreSQL connection.</p>
+                    <label>Server profile <input id="postgres-profile" value="AIGIS_POSTGRES_MAIN" autocomplete="off" class="border p-1"></label>
+                    <button type="button" id="postgres-discover" onclick="discoverPostgresSource()" class="border p-1">Test connection / list tables</button>
+                    <label>Schema / table <select id="postgres-table" class="border p-1" aria-label="PostgreSQL schema and table"></select></label>
+                    <label>Maximum rows <input id="postgres-row-limit" type="number" min="1" max="100000" value="10000" class="border p-1 w-24"></label>
+                    <button type="button" id="postgres-snapshot" onclick="refreshPostgresSnapshot()" disabled class="border p-1">Load / refresh snapshot</button>
+                    <p id="postgres-source-status" role="status" aria-live="polite" class="mt-2">Configure AIGIS_POSTGRES_MAIN on the server to begin.</p>
+                </details>
                 <!-- Cell Header -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-2.5 border-b border-gray-200 gap-2">
                     <div class="flex items-center space-x-2.5">
@@ -3927,6 +4070,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
             <div id="model-relationship-list"></div>
         </div>
     </div>
+    <script src="/assets/wargame-verification.js"></script>
     <script>
         // Dynamic controls use data attributes and listeners, never executable
         // code assembled from database or assistant-provided values.
@@ -3952,6 +4096,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
         const API_BASE = window.location.origin;
         const AIGIS_TOKEN = document.querySelector('meta[name="aigis-token"]')?.getAttribute("content") || "";
         const nativeFetch = window.fetch.bind(window);
+        const wargameSessionId = crypto.randomUUID();
         window.fetch = async function(input, init) {
             const requestUrl = new URL(typeof input === "string" || input instanceof URL ? input : input.url, API_BASE);
             const isSameOrigin = requestUrl.origin === API_BASE;
@@ -3959,6 +4104,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 const options = Object.assign({}, init || {});
                 options.headers = new Headers((init && init.headers) || (input instanceof Request ? input.headers : {}));
                 options.headers.set("X-AIGIS-Token", AIGIS_TOKEN);
+                options.headers.set('X-AIGIS-Wargame-Session', wargameSessionId);
                 const signal = options.signal || (input instanceof Request ? input.signal : null);
                 const timeout = AbortSignal.timeout(requestUrl.pathname.includes('/stream/') ? 10000 : 120000);
                 options.signal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -4651,6 +4797,66 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
                 statusEl.innerText = "Error: " + err;
             } finally {
                 event.target.value = "";
+            }
+        }
+
+        let postgresSourceId = null;
+        async function postgresSourceRequest(path, body) {
+            const response = await fetch(`${API_BASE}/api/v1/database/postgres/${path}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'PostgreSQL source request failed');
+            return result;
+        }
+        async function discoverPostgresSource() {
+            const status = document.getElementById('postgres-source-status');
+            const button = document.getElementById('postgres-discover');
+            const select = document.getElementById('postgres-table');
+            const load = document.getElementById('postgres-snapshot');
+            button.disabled = true; load.disabled = true; postgresSourceId = null;
+            select.replaceChildren(); status.textContent = 'Connecting read-only and discovering tables...';
+            try {
+                const result = await postgresSourceRequest('discover', {profile: document.getElementById('postgres-profile').value.trim()});
+                postgresSourceId = result.source_id;
+                for (const table of result.tables) {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(table); option.textContent = `${table.schema}.${table.table}`;
+                    select.appendChild(option);
+                }
+                load.disabled = !result.tables.length;
+                status.textContent = `Read-only connection verified. ${result.tables.length} tables listed${result.tables_truncated ? ' (list capped)' : ''}. Select a table to load a snapshot.`;
+            } catch (error) { status.textContent = error.message; }
+            finally { button.disabled = false; }
+        }
+        async function refreshPostgresSnapshot() {
+            if (!postgresSourceId) return;
+            const button = document.getElementById('postgres-snapshot');
+            const status = document.getElementById('postgres-source-status');
+            const selection = document.getElementById('postgres-table').value;
+            if (!selection) return;
+            const table = JSON.parse(selection);
+            button.disabled = true;
+            document.getElementById('postgres-discover').disabled = true;
+            status.textContent = 'Reading a bounded snapshot; the previous dataset remains active until success...';
+            try {
+                const result = await postgresSourceRequest('snapshot', {
+                    source_id: postgresSourceId, schema_name: table.schema, table: table.table,
+                    row_limit: Number(document.getElementById('postgres-row-limit').value)
+                });
+                currentDatasetMeta = {type: 'db', name: result.db_name,
+                    displayName: `PostgreSQL snapshot: ${table.schema}.${table.table}`, total_rows: result.rows_imported, size_mb: result.size_mb};
+                updateDatasetDisplay(currentDatasetMeta);
+                powerBiModelCache = null;
+                await initPowerBiDataView();
+                await loadDatabaseStats();
+                await filterDatabaseRows('all');
+                document.getElementById('cell0-db-subtitle').textContent = 'PostgreSQL snapshot • SQLite analysis dialect • not live';
+                status.textContent = `${table.schema}.${table.table}: ${result.rows_imported} rows captured at ${result.captured_at}${result.truncated ? ' — TRUNCATED at row limit' : ''}. Not live; refresh to update. Scan order is not guaranteed latest. SQLite SQL dialect applies to the snapshot.`;
+            } catch (error) { status.textContent = error.message; }
+            finally {
+                button.disabled = false;
+                document.getElementById('postgres-discover').disabled = false;
             }
         }
 
@@ -5410,6 +5616,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
         }
 
         async function runStage3() {
+            clearWargameVerification('NOT ASSESSED — baseline changed; rerun verification');
             highlightActiveCell(3);
             jumpToCell('cell-3');
             const badge = document.getElementById("badge-agent-3");
@@ -5516,6 +5723,7 @@ Welcome, I am the <strong>AI Assistant</strong> for the AIGIS security platform.
         }
 
         async function runStage4() {
+            clearWargameVerification('NOT ASSESSED — controls changed; rerun verification');
             highlightActiveCell(4);
             jumpToCell('cell-4');
             const badge = document.getElementById("badge-agent-4");
@@ -5574,7 +5782,167 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
             }
         }
 
+        let latestTrainingDossier = null;
+        let activeBenchmarkJob = null;
+        async function startDurableBenchmark() {
+            if (activeBenchmarkJob) return;
+            const output = document.getElementById('wargame-job-status');
+            const start = document.getElementById('wargame-job-start');
+            const cancel = document.getElementById('wargame-job-cancel');
+            start.disabled = true;
+            clearWargameVerification('QUEUED — local mock benchmark');
+            try {
+                const job = await fetchWargameResult('/api/v1/wargame/jobs', {
+                    rounds: tweakConfig.adversarialRounds, burst_streams: tweakConfig.burstStreams});
+                activeBenchmarkJob = job.run_id;
+                sessionStorage.setItem('aigis-active-benchmark', activeBenchmarkJob);
+                cancel.disabled = false;
+                await pollDurableBenchmark();
+            } catch (error) {
+                output.textContent = `INCONCLUSIVE: ${error.message}`;
+                clearWargameVerification('INCONCLUSIVE — job status unavailable');
+            } finally { start.disabled = false; }
+        }
+        async function pollDurableBenchmark() {
+            const output = document.getElementById('wargame-job-status');
+            try {
+                while (activeBenchmarkJob) {
+                    const response = await fetch(`${API_BASE}/api/v1/wargame/jobs/${encodeURIComponent(activeBenchmarkJob)}`);
+                    if (!response.ok) throw new Error(`Job status HTTP ${response.status}`);
+                    const job = await response.json();
+                    output.textContent = `${job.run_id}: ${job.status}; completed rounds ${job.run?.result?.completed_rounds ?? job.run?.result?.total_rounds ?? 0}`;
+                    if (!['QUEUED', 'RUNNING'].includes(job.status)) {
+                        if (job.status === 'COMPLETED' && job.run?.status === 'COMPLETED') renderWargameEvidence(job.run.result);
+                        else clearWargameVerification(`NOT ASSESSED — ${job.status}`);
+                        activeBenchmarkJob = null;
+                        sessionStorage.removeItem('aigis-active-benchmark');
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            } finally {
+                document.getElementById('wargame-job-cancel').disabled = !activeBenchmarkJob;
+                document.getElementById('wargame-job-start').disabled = !!activeBenchmarkJob;
+            }
+        }
+        async function cancelDurableBenchmark() {
+            if (!activeBenchmarkJob) return;
+            try {
+                await fetchWargameResult(`/api/v1/wargame/jobs/${encodeURIComponent(activeBenchmarkJob)}/cancel`, {});
+                document.getElementById('wargame-job-status').textContent = 'Cancellation requested; waiting for worker acknowledgement.';
+            } catch (error) { notify(error.message, 'error'); }
+        }
+        async function loadTemporalShadow() {
+            const output = document.getElementById('temporal-shadow-results');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/wargame/classifier/shadow`);
+                if (!response.ok) throw new Error(`Shadow analysis HTTP ${response.status}`);
+                const report = await response.json();
+                output.textContent = `SHADOW ONLY — no blocking. Sample ${report.sample_count}; timing signals ${report.signal_count}; insufficient data ${report.insufficient_count}. Bounded sample, not proof of abuse or real-world accuracy.`;
+            } catch (error) { output.textContent = `Shadow unavailable: ${error.message}`; }
+        }
+        window.addEventListener('load', () => {
+            const saved = sessionStorage.getItem('aigis-active-benchmark');
+            if (saved && !activeBenchmarkJob) {
+                activeBenchmarkJob = saved;
+                document.getElementById('wargame-job-cancel').disabled = false;
+                pollDurableBenchmark().catch(error => { document.getElementById('wargame-job-status').textContent = error.message; });
+            }
+        });
+        async function runControlEvaluation() {
+            const output = document.getElementById('wargame-control-results');
+            output.textContent = 'Running bounded local mock control matrix...';
+            try {
+                const report = await fetchWargameResult('/api/v1/wargame/controls/evaluate', {seed: 1729, burst_streams: 5});
+                output.textContent = report.results.map(row => `${row.scenario} | ${row.mode} | ${row.verified ? 'VERIFIED IN MOCK' : 'NOT VERIFIED'} | legitimate ${row.regression.legitimate_requests_approved}/${row.regression.sample_users_tested}`).join('\n');
+            } catch (error) { output.textContent = `INCONCLUSIVE: ${error.message}`; }
+        }
+        let wargameHistorySelection = null;
+
+        async function loadWargameHistory() {
+            const container = document.getElementById('wargame-history');
+            container.textContent = 'Loading runs...';
+            try {
+                const data = await (await fetch(`${API_BASE}/api/v1/wargame/runs`)).json();
+                container.replaceChildren();
+                for (const run of data.runs) {
+                    const row = document.createElement('div');
+                    row.textContent = `${run.run_id} | ${run.status} | seed ${run.configuration.seed ?? 'N/A'} `;
+                    const view = document.createElement('button'); view.textContent = 'View / compare';
+                    view.addEventListener('click', async () => {
+                        try {
+                            const saved = await (await fetch(`${API_BASE}/api/v1/wargame/runs/${encodeURIComponent(run.run_id)}`)).json();
+                            clearWargameVerification();
+                            renderWargameEvidence(saved.result);
+                            if (wargameHistorySelection) {
+                                const p = document.createElement('p');
+                                p.textContent = `Comparison (not a matched verification): ${wargameHistorySelection.run_id} vs ${saved.run_id}; illegal loss reduction: ${wargameHistorySelection.result.training_summary?.total_capital_defended_usd ?? 'N/A'} vs ${saved.result.training_summary?.total_capital_defended_usd ?? 'N/A'}. Compare only compatible configurations.`;
+                                document.getElementById('wargame-evidence').appendChild(p);
+                            }
+                            wargameHistorySelection = saved;
+                        } catch (error) { notify(error.message, 'error'); }
+                    });
+                    row.appendChild(view);
+                    if (run.status === 'COMPLETED') {
+                        const replay = document.createElement('button'); replay.textContent = 'Replay';
+                        replay.addEventListener('click', async () => {
+                            replay.disabled = true;
+                            clearWargameVerification('RUNNING — replay');
+                            try {
+                                const result = await fetchWargameResult(`/api/v1/wargame/runs/${encodeURIComponent(run.run_id)}/replay`, {});
+                                renderWargameEvidence(result);
+                            } catch (error) { clearWargameVerification('INCONCLUSIVE — replay failed'); notify(error.message, 'error'); }
+                            finally { replay.disabled = false; }
+                        });
+                        row.appendChild(replay);
+                    }
+                    container.appendChild(row);
+                }
+                if (!data.runs.length) container.textContent = 'No saved runs yet.';
+            } catch (error) { container.textContent = `History unavailable: ${error.message}`; }
+        }
+
+        function clearWargameVerification(message = 'NOT ASSESSED') {
+            latestTrainingDossier = null;
+            for (const id of ['retest-mitigation', 'sidebar-mitigation', 'retest-fp', 'sidebar-fp',
+                'retest-latency', 'sidebar-latency', 'arbiter-score', 'arbiter-exposure', 'sidebar-saved']) {
+                const element = document.getElementById(id);
+                if (element) element.innerText = 'N/A';
+            }
+            document.getElementById('wargame-assessment').innerText = message;
+            document.getElementById('wargame-evidence').replaceChildren();
+            for (const id of ['code-diff-preview', 'modal-diff-content']) {
+                const element = document.getElementById(id);
+                if (element) element.innerText = '# No current verified dossier';
+            }
+            const posture = document.getElementById('arbiter-posture-badge');
+            if (posture) posture.innerText = 'NOT ASSESSED';
+        }
+
+        async function fetchWargameResult(path, body) {
+            const response = await fetch(`${API_BASE}${path}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+            });
+            const result = await response.json();
+            if (!response.ok || result.error || result.detail) throw new Error(result.error || 'Wargame request failed');
+            return result;
+        }
+
+        function renderWargameEvidence(result) {
+            const view = wargameVerificationView(result);
+            const assessment = document.getElementById('wargame-assessment');
+            assessment.innerText = view.label;
+            assessment.className = view.passed ? 'font-bold text-emerald-700' : 'font-bold text-amber-700';
+            const container = document.getElementById('wargame-evidence');
+            container.replaceChildren();
+            for (const line of view.lines) {
+                const p = document.createElement('p'); p.textContent = line; container.appendChild(p);
+            }
+            return view.passed;
+        }
+
         async function runStage5() {
+            clearWargameVerification('RUNNING — previous results cleared');
             highlightActiveCell(5);
             jumpToCell('cell-5');
             const badge = document.getElementById("badge-agent-5");
@@ -5585,26 +5953,24 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
 
             try {
                 if (totalRounds > 1) {
-                    const trainRes = await (await fetch(`${API_BASE}/api/v1/wargame/train`, {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({rounds: totalRounds, burst_streams: tweakConfig.burstStreams})
-                    })).json();
+                    const trainRes = await fetchWargameResult('/api/v1/wargame/train', {rounds: totalRounds, burst_streams: tweakConfig.burstStreams});
+                    const passed = renderWargameEvidence(trainRes);
+                    latestTrainingDossier = trainRes.dossier;
 
                     const vLog = document.getElementById("logs-verification");
-                    vLog.innerHTML = `<div class="text-cyan-400 font-bold pb-1">> MULTI-ROUND ADVERSARIAL CO-EVOLUTION COMPLETED (${escapeHtml(trainRes.total_rounds)} ROUNDS in ${escapeHtml(trainRes.training_time_sec)}s):</div>`;
+                    vLog.innerHTML = `<div class="text-cyan-400 font-bold pb-1">> MOCK CONTROL BENCHMARK (${escapeHtml(trainRes.total_rounds)} ROUNDS in ${escapeHtml(trainRes.training_time_sec)}s):</div>`;
                     trainRes.rounds_history.forEach(r => {
                         vLog.innerHTML += `<div class="text-gray-200 font-bold mt-1">> [ROUND ${escapeHtml(r.round)}] ${escapeHtml(r.title)}</div>`;
                         vLog.innerHTML += `<div class="text-rose-300 ml-3">  Red Attack: ${escapeHtml(r.red_tactic)} (Unpatched Loss: $${r.unpatched_loss_usd.toLocaleString()})</div>`;
                         vLog.innerHTML += `<div class="text-sky-300 ml-3">  Blue Defense: ${escapeHtml(r.blue_tactic)} (Mitigation: ${escapeHtml(r.mitigation_rate)}%)</div>`;
-                        vLog.innerHTML += `<div class="text-emerald-400 ml-3 font-semibold">  Security Score: ${escapeHtml(r.score_before)} -> ${escapeHtml(r.score_after)} / 100 (Red ELO: ${escapeHtml(r.red_elo)} | Blue ELO: ${escapeHtml(r.blue_elo)})</div>`;
+                        vLog.innerHTML += `<div class="text-gray-200 ml-3">  Demo heuristic score: ${escapeHtml(r.score_before)} -> ${escapeHtml(r.score_after)} / 100 | ${escapeHtml(r.round_status)}</div>`;
                     });
 
                     const reg = trainRes.regression_report || {};
                     vLog.innerHTML += `<div class="text-cyan-400 font-bold pt-1.5">> ZERO-REGRESSION SUITE: ${escapeHtml(reg.sample_users_tested ?? 'N/A')} legit users tested. ${escapeHtml(reg.legitimate_requests_approved ?? 'N/A')} approved. False positives: ${escapeHtml(reg.false_positive_rate ?? 'N/A')}</div>`;
 
                     const defended = trainRes.training_summary?.total_capital_defended_usd;
-                    const mitigation = trainRes.training_summary?.mitigation_rate;
+                    const mitigation = trainRes.training_summary?.final_mitigation_rate;
                     document.getElementById("retest-mitigation").innerText = defended === undefined ? "N/A" : `$${Number(defended).toLocaleString()} Defended (${mitigation ?? 'N/A'}%)`;
                     document.getElementById("sidebar-mitigation").innerText = mitigation === undefined ? "N/A" : `${mitigation}%`;
                     document.getElementById("retest-fp").innerText = reg.false_positive_rate ?? "N/A";
@@ -5612,14 +5978,14 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     const trainLatency = reg.latency_overhead_ms;
                     document.getElementById("retest-latency").innerText = trainLatency === undefined ? "N/A" : `+${trainLatency}ms`;
                     document.getElementById("sidebar-latency").innerText = trainLatency === undefined ? "N/A" : `+${trainLatency}ms`;
-                    if (badge) { badge.innerText = `TRAINING COMPLETE (${totalRounds}R)`; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
+                    if (badge) { badge.innerText = passed ? `MOCK PASSED (${totalRounds}R)` : 'NOT VERIFIED'; badge.className = passed ? 'text-xs font-bold text-emerald-700' : 'text-xs font-bold text-amber-700'; }
                     return trainRes;
                 } else {
-                    const retestData = await (await fetch(`${API_BASE}/api/v1/wargame/stage/5_retest`, {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({burst_streams: tweakConfig.burstStreams})
-                    })).json();
+                    const retestData = await fetchWargameResult('/api/v1/wargame/stage/5_retest', {burst_streams: tweakConfig.burstStreams});
+                    const dossier = await fetchWargameResult('/api/v1/wargame/stage/6_dossier', {});
+                    const passed = renderWargameEvidence({assessment_state: dossier.assessment_state,
+                        success: dossier.assessment_state === 'MITIGATION_VERIFIED_IN_MOCK', regression_report: retestData.regression,
+                        round_evidence: [{retest: retestData.retest, dossier}]});
 
                     const retest = retestData.retest;
                     const reg = retestData.regression;
@@ -5643,10 +6009,11 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     }
                     vLog.innerHTML += `<div class="text-cyan-400 font-bold pt-1.5">> ZERO-REGRESSION SUITE: ${escapeHtml(reg.sample_users_tested)} legit users tested. ${escapeHtml(reg.legitimate_requests_approved)} approved. False positives: ${escapeHtml(reg.false_positive_rate)}</div>`;
 
-                    if (badge) { badge.innerText = `${mitigationPct}% BLOCKED`; badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider"; }
+                    if (badge) { badge.innerText = passed ? 'MOCK PASSED' : 'NOT VERIFIED'; badge.className = passed ? 'text-xs font-bold text-emerald-700' : 'text-xs font-bold text-amber-700'; }
                     return retestData;
                 }
             } catch (err) {
+                clearWargameVerification('INCONCLUSIVE — verification request failed');
                 if (badge) { badge.innerText = "ERROR"; badge.className = "text-xs font-mono font-bold text-rose-600 uppercase tracking-wider"; }
                 throw err;
             } finally {
@@ -5656,6 +6023,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
 
 
         async function runMultiCycleStressRecheck(cycles = 5) {
+            clearWargameVerification('RUNNING — cycle check; full regression not assessed');
             highlightActiveCell(5);
             jumpToCell('cell-5');
             const badge = document.getElementById("badge-agent-5");
@@ -5684,6 +6052,11 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     })
                 });
                 const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || 'Recheck request failed');
+                document.getElementById('wargame-assessment').innerText = data.success
+                    ? 'CYCLE CHECK PASSED IN MOCK — full regression not assessed'
+                    : 'CYCLE CHECK FAILED — inspect leaks and over-blocking';
+                document.getElementById('wargame-evidence').textContent = `Run: ${data.run_id ?? 'N/A'} | Seed: ${data.configuration?.seed ?? 'N/A'} | ${data.verdict ?? 'No verdict available'}`;
 
                 if (data.success) {
                     const blockRateStr = `${data.total_blocked}/${data.total_exploit_attempts} (${data.mitigation_rate}%)`;
@@ -5707,17 +6080,18 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                     }
 
                     if (badge) {
-                        badge.innerText = `IMMUNE (${cycles}C)`;
+                        badge.innerText = `MOCK CYCLES PASSED (${cycles}C)`;
                         badge.className = "text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider";
                     }
                 } else {
-                    if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> FAILED: ${escapeHtml(data.error || 'Unknown error')}</div>`;
+                    if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> FAILED: ${escapeHtml(data.verdict || data.error || 'Verification failed')}</div>`;
                     if (badge) {
                         badge.innerText = "FAILED";
                         badge.className = "text-xs font-mono font-bold text-rose-600 uppercase tracking-wider";
                     }
                 }
             } catch (err) {
+                clearWargameVerification('INCONCLUSIVE — cycle recheck request failed');
                 if (vLog) vLog.innerHTML += `<div class="text-rose-400 font-bold mt-2">> RECHECK ERROR: ${escapeHtml(err)}</div>`;
                 if (badge) {
                     badge.innerText = "ERROR";
@@ -5736,15 +6110,15 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
             if (btn) btn.disabled = true;
 
             try {
-                const dossier = await (await fetch(`${API_BASE}/api/v1/wargame/stage/6_dossier`, {method: "POST"})).json();
+                const dossier = latestTrainingDossier || await fetchWargameResult('/api/v1/wargame/stage/6_dossier', {});
                 const scoreBefore = dossier.initial_score ?? dossier.security_score_before ?? null;
                 const scoreAfter = dossier.patched_score ?? dossier.security_score_after ?? null;
                 const prDiff = dossier.git_pull_request_diff ?? dossier.git_pull_request?.diff ?? "";
                 const savedAmount = dossier.financial_exposure_saved ?? null;
 
                 document.getElementById("arbiter-score").innerText = (scoreBefore === null || scoreAfter === null) ? "N/A" : `${scoreBefore} -> ${scoreAfter} / 100`;
-                document.getElementById("arbiter-exposure").innerText = savedAmount === null ? "N/A" : `$${Number(savedAmount).toLocaleString()} / day`;
-                document.getElementById("sidebar-saved").innerText = savedAmount === null ? "N/A" : `$${Number(savedAmount).toLocaleString()}/d`;
+                document.getElementById("arbiter-exposure").innerText = savedAmount === null ? "N/A" : `$${Number(savedAmount).toLocaleString()} / matched mock event`;
+                document.getElementById("sidebar-saved").innerText = savedAmount === null ? "N/A" : `$${Number(savedAmount).toLocaleString()} / event`;
                 document.getElementById("code-diff-preview").innerText = prDiff;
                 const modalDiff = document.getElementById("modal-diff-content");
                 if (modalDiff) modalDiff.innerText = prDiff;
@@ -5812,6 +6186,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                 return dossier;
             } catch (err) {
                 console.error("Dossier generation error:", err);
+                clearWargameVerification('INCONCLUSIVE — dossier request failed');
                 throw err;
             } finally {
                 if (btn) btn.disabled = false;
@@ -5819,6 +6194,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
         }
 
         async function runFullWargame() {
+            clearWargameVerification('RUNNING — previous results cleared');
             switchPowerBiView('wargame');
             const btn = document.getElementById("btn-run-wargame");
             btn.disabled = true;
@@ -5853,6 +6229,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
                 jumpToCell('cell-6');
             } catch (err) {
                 console.error("Wargame execution error:", err);
+                clearWargameVerification('INCONCLUSIVE — workflow interrupted');
                 notify("Execution error: " + err.message, 'error');
             } finally {
                 btn.disabled = false;
@@ -5894,6 +6271,7 @@ async def claim_voucher(request: Request, user_id: str, voucher_code: str):
             document.getElementById("logs-sandbox").innerHTML = `<span class="text-gray-500 italic">// Click [RUN ALL CELLS] or [RUN ATTACK] to execute sandbox burst attack...</span>`;
             document.getElementById("logs-verification").innerHTML = `<span class="text-gray-500 italic">// Awaiting patch deployment to run verification suite...</span>`;
             document.getElementById("code-diff-preview").innerText = "# Pull Request diff will appear after wargame evaluation completes...";
+            clearWargameVerification();
         }
 
         function openPRModal() {

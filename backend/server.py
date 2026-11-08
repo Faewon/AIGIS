@@ -46,7 +46,10 @@ from backend.agents.quant_investigator import global_quant_investigator
 from backend.agents.secops_copilot import global_secops_copilot
 from backend.agents.work_order_generator import global_work_order_generator
 from backend.simulation import simulation_scope
-from backend.run_store import get_run, save_run
+from backend.run_store import get_run, save_run, list_runs
+from backend.simulation import target_scope
+from backend.mock_target.store import VulnerableVoucherStore
+from contextvars import ContextVar
 from backend.observability import event
 
 @asynccontextmanager
@@ -61,7 +64,15 @@ async def lifespan(app: FastAPI):
         print("[AIGIS] Live Telemetry Stream Engine started (10 TPS, 99% Benign, 1% Attack).")
     except Exception as e:
         print(f"[AIGIS] Failed to start stream engine: {e}")
-    yield
+    from backend.job_queue import worker
+    job_worker = asyncio.create_task(worker())
+    try:
+        yield
+    finally:
+        job_worker.cancel()
+        from contextlib import suppress
+        with suppress(asyncio.CancelledError):
+            await job_worker
     # shutdown
     try:
         stream_engine.stop()
@@ -119,6 +130,42 @@ class ApiInput(BaseModel):
     seed: int | None = Field(default=None, ge=0, le=4294967295)
 
 
+class WargameInput(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    rounds: int = Field(default=3, ge=1, le=10)
+    cycles: int = Field(default=5, ge=1, le=20)
+    burst_streams: int = Field(default=15, ge=2, le=100)
+    seed: int | None = Field(default=None, ge=0, le=4294967295)
+
+
+class PostgresSourceInput(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    profile: str = Field(default='', max_length=64)
+    source_id: str = Field(default='', max_length=32)
+    schema_name: str = Field(default='public', min_length=1, max_length=63)
+    table: str = Field(default='telemetry', min_length=1, max_length=63)
+    row_limit: int = Field(default=100000, ge=1, le=100000)
+
+
+_stage_context = ContextVar('aigis_stage_context', default=None)
+_stage_sessions = {}
+
+
+class StageState(dict):
+    def _state(self):
+        return _stage_context.get() if _stage_context.get() is not None else self
+
+    def get(self, key, default=None):
+        state = self._state()
+        return dict.get(state, key, default)
+
+    def __setitem__(self, key, value):
+        dict.__setitem__(self._state(), key, value)
+
+    def __getitem__(self, key):
+        return dict.__getitem__(self._state(), key)
+
+
 _simulation_lock = threading.Lock()
 
 app = FastAPI(
@@ -151,7 +198,10 @@ async def local_api_auth_middleware(request: Request, call_next):
             try:
                 raw = await request.body()
                 body = json.loads(raw) if raw else {}
-                validated = ApiInput.model_validate(body)
+                strict_wargame = request.url.path in {'/api/v1/wargame/train', '/api/v1/wargame/run_full',
+                    '/api/v1/wargame/recheck_multicycle', '/api/v1/wargame/controls/evaluate', '/api/v1/wargame/jobs'}
+                input_model = PostgresSourceInput if request.url.path.startswith('/api/v1/database/postgres/') else (WargameInput if strict_wargame else ApiInput)
+                validated = input_model.model_validate(body)
                 normalized = validated.model_dump(exclude_unset=True)
                 request._body = json.dumps(normalized).encode()
                 request._json = normalized
@@ -168,7 +218,29 @@ async def local_api_auth_middleware(request: Request, call_next):
         while not _simulation_lock.acquire(blocking=False):
             await asyncio.sleep(0.01)
     try:
-        if isolated:
+        stage_id = request.headers.get('x-aigis-wargame-session')
+        scoped_stage = stage_id and (path.startswith(('/api/v1/wargame/stage/', '/api/v1/target/'))
+                                    or path == '/api/v1/wargame/state' or path == '/api/v1/wargame/recheck_multicycle')
+        if scoped_stage:
+            if not (len(stage_id) <= 64 and stage_id.replace('-', '').isalnum()):
+                return JSONResponse(status_code=422, content={'detail': 'Invalid stage session ID'})
+            now = time.monotonic()
+            for key in list(_stage_sessions):
+                if now - _stage_sessions[key]['touched'] > 3600:
+                    del _stage_sessions[key]
+            if stage_id not in _stage_sessions:
+                if len(_stage_sessions) >= 100:
+                    return JSONResponse(status_code=429, content={'detail': 'Too many stage sessions'})
+                _stage_sessions[stage_id] = {'store': VulnerableVoucherStore(), 'state': {}, 'touched': now}
+            session = _stage_sessions[stage_id]
+            session['touched'] = now
+            token = _stage_context.set(session['state'])
+            try:
+                with target_scope(session['store']):
+                    response = await call_next(request)
+            finally:
+                _stage_context.reset(token)
+        elif isolated:
             body = await request.json()
             with simulation_scope(body.get("seed")) as run:
                 request.state.simulation_run = run
@@ -199,7 +271,7 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 BUNDLE_FILE = os.path.join(BASE_DIR, "backend", "mock_target", "checkout_bundle.js")
 
 # Bộ nhớ lưu trạng thái Wargame hiện tại
-wargame_state = {
+wargame_state = StageState({
     "current_stage": "IDLE",
     "rea_report": None,
     "red_report": None,
@@ -208,7 +280,7 @@ wargame_state = {
     "retest_attack_report": None,
     "regression_report": None,
     "dossier": None
-}
+})
 
 # ==============================================================================
 # 1. AGENT CONFIGURATION & LLM SETTINGS
@@ -274,8 +346,9 @@ async def get_target_status():
 @app.post("/api/v1/target/reset")
 async def reset_target():
     mock_store.reset()
-    global wargame_state
-    wargame_state = {
+    state = wargame_state._state()
+    state.clear()
+    state.update({
         "current_stage": "IDLE",
         "rea_report": None,
         "red_report": None,
@@ -284,7 +357,7 @@ async def reset_target():
         "retest_attack_report": None,
         "regression_report": None,
         "dossier": None
-    }
+    })
     return {"message": "Target and Wargame state reset successfully."}
 
 # ==============================================================================
@@ -452,7 +525,64 @@ async def run_full_wargame(request: Request = None):
 
 @app.get("/api/v1/wargame/state")
 async def get_wargame_state():
-    return wargame_state
+    return dict(wargame_state._state())
+
+
+@app.get('/api/v1/wargame/runs')
+async def simulation_run_history():
+    return {'runs': await asyncio.to_thread(list_runs)}
+
+
+@app.post('/api/v1/wargame/jobs')
+async def submit_benchmark_job(request: Request):
+    from backend.job_queue import submit
+    body = WargameInput.model_validate(await request.json()).model_dump()
+    try:
+        run_id = await asyncio.to_thread(submit, body)
+    except OverflowError as error:
+        return JSONResponse(status_code=429, content={'error': str(error)})
+    return JSONResponse(status_code=202, content={'run_id': run_id, 'status': 'QUEUED'})
+
+
+@app.get('/api/v1/wargame/jobs/{run_id}')
+async def benchmark_job_status(run_id: str):
+    from backend.job_queue import lookup
+    job = await asyncio.to_thread(lookup, run_id)
+    return job if job else JSONResponse(status_code=404, content={'error': 'Job not found'})
+
+
+@app.post('/api/v1/wargame/jobs/{run_id}/cancel')
+async def cancel_benchmark_job(run_id: str):
+    from backend.job_queue import cancel
+    job = await asyncio.to_thread(cancel, run_id)
+    return job if job else JSONResponse(status_code=404, content={'error': 'Job not found'})
+
+
+@app.post('/api/v1/wargame/controls/evaluate')
+async def evaluate_wargame_controls(request: Request):
+    from backend.control_evaluation import evaluate_controls
+    body = await request.json()
+    return await evaluate_controls(body.get('seed') if body.get('seed') is not None else 1729,
+                                   body.get('burst_streams', 5))
+
+
+@app.get('/api/v1/wargame/classifier/evaluation')
+async def wargame_classifier_evaluation():
+    from backend.classifier_evaluation import evaluate_classifier, evaluate_temporal_holdout
+    return {'per_row': evaluate_classifier(), 'temporal_holdout': evaluate_temporal_holdout()}
+
+
+@app.get('/api/v1/wargame/classifier/shadow')
+async def temporal_shadow_analysis():
+    def analyze():
+        from backend.temporal_classifier import classify_event_sequence
+        rows = query_telemetry_rows(limit=2000, offset=0, filter_type='all')
+        results = classify_event_sequence(rows)
+        return {'mode': 'SHADOW_ONLY', 'enforcement': False, 'sample_count': len(rows),
+                'sample_limit': 2000, 'signal_count': sum(r.get('temporal_state') == 'SIGNAL_DETECTED' for r in results),
+                'insufficient_count': sum(r.get('temporal_state') == 'INSUFFICIENT_DATA' for r in results),
+                'scope': 'Bounded read-only sample of the selected dataset; no full-stream coverage guarantee'}
+    return await asyncio.to_thread(analyze)
 
 
 @app.get("/api/v1/wargame/runs/{run_id}")
@@ -467,6 +597,20 @@ async def replay_simulation_run(run_id: str):
     if not saved:
         return JSONResponse(status_code=404, content={"error": "Run not found"})
     config = saved["configuration"]
+    from backend.wargame_workload import VERSION
+    if config.get('kind') == 'training' and config.get('simulation_version') != VERSION:
+        return JSONResponse(status_code=409, content={'error': 'Incompatible simulation version; create a new benchmark'})
+    if saved['status'] != 'COMPLETED':
+        return JSONResponse(status_code=409, content={'error': 'Only completed runs can be replayed'})
+    if config.get('kind') == 'training':
+        from backend.wargame_workload import validate_workloads, execution_versions
+        from backend.agents.adversarial_trainer import SCENARIOS
+        try:
+            validate_workloads(config.get('workloads'), config['total_rounds'], config['burst_streams'], SCENARIOS)
+            if config.get('versions') != execution_versions():
+                raise ValueError('Saved execution version differs from current code')
+        except ValueError as error:
+            return JSONResponse(status_code=409, content={'error': str(error)})
     if config.get("kind") == "recheck":
         with simulation_scope(config["seed"]) as run:
             mock_store.patch_enabled = config["patch_enabled"]
@@ -478,7 +622,8 @@ async def replay_simulation_run(run_id: str):
             await asyncio.to_thread(save_run, run["run_id"], replay_config, result)
             return result
     return await global_adversarial_trainer.train_adversarial_rounds(
-        total_rounds=config["total_rounds"], burst_streams=config["burst_streams"], seed=config["seed"])
+        total_rounds=config["total_rounds"], burst_streams=config["burst_streams"], seed=config["seed"],
+        workloads=config['workloads'])
 
 # ==============================================================================
 # 4. DATASET EXPLORER & SYNTHETIC TELEMETRY (1,000,000 ROWS)
@@ -578,6 +723,32 @@ async def connect_database_endpoint(request: Request):
         return JSONResponse(status_code=400, content={"success": False, "error": "Missing db_path parameter"})
     res = set_active_db(db_path)
     return res
+
+
+async def _postgres_action(function, *args):
+    try:
+        return await asyncio.to_thread(function, *args)
+    except ImportError:
+        return JSONResponse(status_code=503, content={'success': False, 'error': 'Install the optional PostgreSQL dependencies from requirements-postgres.txt'})
+    except ValueError:
+        return JSONResponse(status_code=400, content={'success': False, 'error': 'Invalid or unavailable PostgreSQL profile/table, snapshot limit, or data budget. Previous dataset unchanged.'})
+    except Exception:
+        # Driver exceptions may embed DSNs, passwords, hosts and query contents.
+        return JSONResponse(status_code=502, content={'success': False, 'error': 'PostgreSQL operation failed. Check server profile, TLS, permissions and connectivity. Previous dataset unchanged.'})
+
+
+@app.post('/api/v1/database/postgres/discover')
+async def discover_postgres_source(request: Request):
+    from backend.postgres_source import discover
+    body = PostgresSourceInput.model_validate(await request.json())
+    return await _postgres_action(discover, body.profile)
+
+
+@app.post('/api/v1/database/postgres/snapshot')
+async def snapshot_postgres_source(request: Request):
+    from backend.postgres_source import snapshot
+    body = PostgresSourceInput.model_validate(await request.json())
+    return await _postgres_action(snapshot, body.source_id, body.schema_name, body.table, body.row_limit)
 
 async def _stream_upload_to_disk(file: UploadFile, dest_path: Path, max_bytes: int = 50 * 1024 * 1024) -> tuple[bool, str]:
     total = 0
@@ -739,6 +910,11 @@ async def serve_dashboard():
                   + "; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
         return HTMLResponse(content=dashboard, headers={"Content-Security-Policy": policy})
     return HTMLResponse(content="<h1>AIGIS Dashboard not found in frontend/index.html</h1>", status_code=404)
+
+
+@app.get("/assets/wargame-verification.js")
+async def wargame_verification_view():
+    return FileResponse(os.path.join(FRONTEND_DIR, "wargame-verification.js"), media_type="text/javascript")
 
 
 @app.get("/assets/model-layout-worker.js")

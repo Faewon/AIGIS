@@ -9,6 +9,7 @@ from backend.run_store import save_run
 from backend.evidence import illegal_loss
 from backend.patch_registry import reference_diff, metadata
 from backend.llm_engine import global_llm_engine
+from backend.wargame_workload import make_workload, VERSION
 from .sandbox_runner import SandboxRunnerAgent
 from .blue_aegis import BlueAegisAgent
 from .arbiter import ArenaArbiterAgent
@@ -23,26 +24,33 @@ class AdversarialTrainer:
         self.arbiter_agent = ArenaArbiterAgent()
 
     @isolated_training
-    async def train_adversarial_rounds(self, total_rounds=5, burst_streams=15, seed=None):
+    async def train_adversarial_rounds(self, total_rounds=5, burst_streams=15, seed=None, run_id=None, workloads=None):
         start = time.perf_counter()
         run = current_run()
         total_rounds = max(1, min(int(total_rounds), 20))
         burst_streams = max(2, min(int(burst_streams), 100))
+        from backend.wargame_workload import validate_workloads, execution_versions
+        manifests = workloads if workloads is not None else [
+            make_workload(run['seed'], SCENARIOS[i % len(SCENARIOS)], burst_streams, i) for i in range(total_rounds)]
+        validate_workloads(manifests, total_rounds, burst_streams, SCENARIOS)
         config = {**run, "kind": "training", "total_rounds": total_rounds, "burst_streams": burst_streams,
-                  "scenarios": list(SCENARIOS), "simulation_version": 1,
+                  "scenarios": list(SCENARIOS), "simulation_version": VERSION, "workloads": manifests,
+                  "versions": execution_versions(),
                   "reproducibility": "Workload and outcomes; wall-clock latency and generated IDs vary."}
         history, pairs = [], []
         patch = {"patch_strategy": "MOCK_TARGET_CONTROLS", "patch_code": reference_diff(),
                  "template_metadata": metadata(), "status": "SIMULATED_PATCH_DEPLOYED"}
         for index in range(total_rounds):
             scenario = SCENARIOS[index % len(SCENARIOS)]
+            workload = manifests[index]
             mock_store.set_all_patches(False)
-            attack = await self.sandbox_agent.execute_scenario(scenario, burst_streams)
+            attack = await self.sandbox_agent.execute_scenario(scenario, burst_streams, workload)
             mock_store.set_all_patches(True)
-            retest = await self.sandbox_agent.execute_scenario(scenario, burst_streams)
-            dossier = await self.arbiter_agent.generate_dossier(attack, patch, {}, retest)
-            pairs.append({"attack": attack, "retest": retest, "dossier": dossier})
-            verified = dossier["assessment_state"] == "MITIGATION_VERIFIED_IN_MOCK"
+            retest = await self.sandbox_agent.execute_scenario(scenario, burst_streams, workload)
+            regression = await self.blue_agent.run_zero_regression_test(10, scenario)
+            dossier = await self.arbiter_agent.generate_dossier(attack, patch, regression, retest)
+            pairs.append({"attack": attack, "retest": retest, "regression": regression, "dossier": dossier})
+            verified = dossier["assessment_state"] == "MITIGATION_VERIFIED_IN_MOCK" and regression['status'] == 'ZERO_REGRESSION_VERIFIED'
             history.append({"round": index + 1, "title": f"Round {index+1}: {scenario}", "scenario": scenario,
                             "red_tactic": scenario, "red_description": "Measured mock scenario",
                             "llm_red_insight": None, "llm_blue_patch": None,
@@ -53,11 +61,16 @@ class AdversarialTrainer:
                             "unpatched_loss_usd": illegal_loss(attack), "retest_loss_usd": illegal_loss(retest),
                             "mitigation_rate": dossier["score_breakdown"]["mitigation_rate"] * 100,
                             "score_before": dossier["initial_score"], "score_after": dossier["patched_score"],
-                            "red_elo": 1200 - 5 * (index+1) if verified else 1200,
-                            "blue_elo": 1150 + 10 * (index+1) if verified else 1150,
                             "round_status": "CONVERGED_NEUTRALIZED" if verified else "FAILED",
-                            "evidence": attack.get("evidence")})
-        regression = await self.blue_agent.run_zero_regression_test(50)
+                             "evidence": attack.get("evidence")})
+            save_run(run['run_id'], config, {'completed_rounds': index + 1, 'round_evidence': pairs}, 'RUNNING')
+        samples = sum(p['regression']['sample_users_tested'] for p in pairs)
+        approved = sum(p['regression']['legitimate_requests_approved'] for p in pairs)
+        regression = {"status": "ZERO_REGRESSION_VERIFIED" if all(p['regression']['status'] == 'ZERO_REGRESSION_VERIFIED' for p in pairs) else 'REGRESSION_DETECTED',
+                      'sample_users_tested': samples, 'legitimate_requests_approved': approved,
+                      'false_positive_rate': f'{(samples-approved)/samples*100:.2f}%',
+                      'latency_overhead_ms': max(p['regression']['latency_overhead_ms'] for p in pairs),
+                      'scenario_reports': [p['regression'] for p in pairs]}
         # The compatibility dossier has one matched scope; aggregates are separate.
         dossier = await self.arbiter_agent.generate_dossier(pairs[-1]["attack"], patch, regression, pairs[-1]["retest"])
         converged = all(r["round_status"] == "CONVERGED_NEUTRALIZED" for r in history)
@@ -71,12 +84,12 @@ class AdversarialTrainer:
                   "initial_security_score": history[0]["score_before"], "final_security_score": history[-1]["score_after"],
                   "score_progression": [r["score_after"] for r in history], "rounds_history": history,
                   "round_evidence": pairs, "regression_report": regression, "dossier": dossier,
-                  "final_red_elo": history[-1]["red_elo"], "final_blue_elo": history[-1]["blue_elo"],
                   "training_summary": {"total_exploits_tested": sum(r["attack_total_requests"] for r in history),
                       "total_capital_defended_usd": sum(max(0, r["unpatched_loss_usd"] - r["retest_loss_usd"]) for r in history),
                       "final_mitigation_rate": round((1 - remaining / total_illegal) * 100, 1) if total_illegal else 0,
                       "convergence_state": "MEASURED_CONVERGED" if converged else "NOT_CONVERGED"}}
-        await asyncio.to_thread(save_run, run["run_id"], config, result)
+        # A lifecycle write must finish before cancellation can mark this run.
+        save_run(run["run_id"], config, result)
         return result
 
     async def run_multicycle_recheck(self, cycles=5, burst_streams=15, seed=None):

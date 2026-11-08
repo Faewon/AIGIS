@@ -1,5 +1,5 @@
 # AIGIS — Adversarial Intelligence for Generative Immunity & Security
-> Status: Current · Updated: 2026-11-08 · Scope: Local simulation
+> Status: Current · Updated: 2026-11-09 · Scope: Local simulation and read-only data sources
 >
 > [Mục lục](README.md) · [Backend reliability](backend-reliability.md)
 
@@ -168,7 +168,9 @@ aigis/
 
 `backend/simulation.py` dùng `ContextVar` để cấp mock store riêng cho mỗi full workflow/training. Khi hoàn tất, lỗi hoặc hủy, context được khôi phục. Các round lưu từng cặp attack/retest và dossier; `dossier` tương thích là round cuối, `training_summary` chứa tổng hợp toàn bộ round.
 
-Các endpoint stage-by-stage cũ vẫn dùng **một session chia sẻ, được tuần tự hóa**. Khi dùng session này, chạy API với một worker. Dùng full workflow để chạy các thí nghiệm độc lập đồng thời.
+UI gửi `X-AIGIS-Wargame-Session` để cô lập mock store/trạng thái từng tab; session hết hạn sau một giờ, tối đa 100 session. Caller không gửi header vẫn dùng session chia sẻ được tuần tự hóa; dùng một API worker cho luồng legacy này. Session từng bước ở RAM, không phải durable job.
+
+`backend/job_queue.py` lưu job trong SQLite: nhận job nguyên tử, tối đa 20 job chờ/đang chạy và một durable job hoạt động. Worker thuộc lifespan ứng dụng, kiểm tra cancel/heartbeat và deadline 120 giây. Lease quá 10 giây được đánh dấu `INTERRUPTED` hoặc `TIMED_OUT` khi worker claim tiếp theo; không tự retry. Các route đồng bộ cũ không chịu giới hạn của queue. Xem [chi tiết vòng đời](wargame-improvements.md#durable-execution-and-replay).
 
 ### 6.3. Lưu trữ và tái hiện
 
@@ -180,6 +182,22 @@ Các endpoint stage-by-stage cũ vẫn dùng **một session chia sẻ, được
 | `/api/v1/wargame/train` | POST | Training nhiều round, hỗ trợ seed |
 | `/api/v1/wargame/recheck_multicycle` | POST | Kiểm tra nhiều cycle và lưu manifest |
 | `/api/v1/wargame/runs/{run_id}` | GET | Đọc cấu hình và evidence đã lưu |
-| `/api/v1/wargame/runs/{run_id}/replay` | POST | Chạy lại cấu hình/seed đã lưu, tạo run mới |
+| `/api/v1/wargame/runs/{run_id}/replay` | POST | Chạy manifest training tương thích hoặc cấu hình recheck, tạo run mới |
+| `/api/v1/wargame/jobs` | POST | Tạo durable job, trả 202 |
+| `/api/v1/wargame/jobs/{run_id}` | GET | Đọc trạng thái job và run |
+| `/api/v1/wargame/jobs/{run_id}/cancel` | POST | Yêu cầu hủy job |
 
-Seed giúp tái hiện cấu hình và kết quả chức năng, không đảm bảo ID hoặc latency theo đồng hồ giống hệt. Chi tiết patch registry, performance và stress evaluation xem [Backend reliability](backend-reliability.md).
+Training lưu manifest v3 trước/sau theo cùng workload; replay đọc trực tiếp manifest đã lưu, kiểm tra hash, schema/scenario/control và hash source code. Run v2 còn đọc được nhưng không replay trên v3. Seed thay đổi lịch voucher, thứ tự fixture BOLA/tamper và ID đơn hàng tổng hợp; giá trị tiền và chuỗi trạng thái vẫn là fixture chuẩn. Không đảm bảo latency giống hệt. Recheck dùng cấu hình/control/seed đã lưu, không áp dụng hợp đồng manifest training. Chi tiết xem [Backend reliability](backend-reliability.md).
+
+## 7. PostgreSQL như nguồn dữ liệu chỉ đọc
+
+```text
+Server environment profile → psycopg read-only transaction
+  → schema/table discovery → bounded table snapshot
+  → backend/datasets/uploads/postgres_<id>.db
+  → existing SQLite dashboard / classifier / SQL analysis
+```
+
+`backend/postgres_source.py` dùng driver tùy chọn `psycopg`, profile `AIGIS_POSTGRES_<NAME>` chỉ nằm ở server, identifier được quote bằng driver và giá trị được parameterize. Không nhận DSN/password từ trình duyệt, không chạy SQL console trên remote. Connection timeout 5s, statement timeout 10s và lock timeout 2s; role chỉ đọc và TLS do người vận hành cấu hình.
+
+Giới hạn: 500 bảng trong discovery, 200 cột, 100.000 dòng và 50 MiB dữ liệu chuyển đổi. Snapshot theo scan order, không hứa là bản ghi mới nhất; refresh thủ công, lỗi giữ dataset cũ. Metadata nguồn ở RAM; file snapshot tồn tại sau restart nhưng provenance PostgreSQL không tự phục hồi. Dataset active vẫn dùng chung toàn ứng dụng. Stream mô phỏng, run history và queue vẫn ở SQLite. Xem [cài đặt và giới hạn](postgresql.md).
