@@ -2,7 +2,7 @@
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="data:,">
     <title>AIGIS - Autonomous Business Logic Vulnerability Proving Ground</title>
@@ -406,18 +406,36 @@ pre.bg-gray-950 code {
 
 /* Responsive Breakpoints */
 @media (min-width: 640px) {
-    .sm\:block { display: block; }
+    .sm\:block { display: block !important; }
+    .sm\:inline { display: inline !important; }
     .sm\:flex-row { flex-direction: row; }
     .sm\:items-center { align-items: center; }
     .sm\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+    .sm\:text-right { text-align: right; }
+    .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sm\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 768px) {
-    .md\:block { display: block; }
+    .md\:block { display: block !important; }
+    .md\:inline { display: inline !important; }
+    .md\:flex { display: flex !important; }
+    .md\:flex-row { flex-direction: row; }
+    .md\:items-center { align-items: center; }
     .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 1024px) {
-    .lg\:block { display: block; }
-    .lg\:flex { display: flex; }
+    .lg\:block { display: block !important; }
+    .lg\:flex { display: flex !important; }
+    .lg\:grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+    .xl\:flex { display: flex !important; }
+    .xl\:w-80 { width: 20rem; }
+}
+@media (min-width: 1536px) {
+    .\32xl\:inline { display: inline !important; }
 }
 
 /* Kaggle Notebook Cell Architecture */
@@ -478,7 +496,6 @@ pre.bg-gray-950 code {
     [id^="pbi-page-"] { min-width: 0; max-width: 100%; }
     .modal-backdrop-aigis { padding: 0.75rem !important; }
     .modal-backdrop-aigis > div { min-width: 0; max-width: 100%; }
-    .sp-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
 
 .modal-container-scroll {
@@ -615,6 +632,9 @@ button:disabled { cursor: wait; opacity: .6; }
     flex-direction: column;
     gap: 4px;
     min-width: 0;
+}
+@media (max-width: 640px) {
+    .sp-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
 .sp-kpi:first-child {
     border-left: 0;
@@ -1070,10 +1090,6 @@ button:disabled { cursor: wait; opacity: .6; }
 .pbi-right-pane {
     background-color: #faf9f8 !important;
     border-left: 1px solid #e1dfdd !important;
-}
-
-    background-color: #f3f2f1 !important;
-    color: #605e5c !important;
 }
 
 .pbi-btn-green {
