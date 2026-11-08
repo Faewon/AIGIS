@@ -68,10 +68,10 @@ def syntax_checks():
     doc.feed(html)
     doc.scripts.append(javascript)
     for i, source in enumerate(doc.scripts):
-        result = subprocess.run(["node", "--check"], input=source, text=True, capture_output=True)
+        result = subprocess.run(["node", "--check"], input=source, text=True, encoding="utf-8", capture_output=True)
         check(f"Dashboard JavaScript syntax {i + 1}", result.returncode == 0, result.stderr.strip())
     for path in (ROOT / "backend").rglob("*.js"):
-        result = subprocess.run(["node", "--check", str(path)], text=True, capture_output=True)
+        result = subprocess.run(["node", "--check", str(path)], text=True, encoding="utf-8", capture_output=True)
         check(f"JavaScript syntax {path.relative_to(ROOT)}", result.returncode == 0, result.stderr.strip())
     duplicates = {key: value for key, value in Counter(doc.ids).items() if value > 1}
     check("Unique HTML IDs", not duplicates, json.dumps(duplicates))
@@ -112,7 +112,7 @@ def smoke_checks(doc):
             actual.feed(response.text)
             check("Strict external script CSP", "script-src 'self';" in csp and not any(actual.scripts) and not actual.handlers)
             response_script = client.get("/assets/dashboard.js")
-            result = subprocess.run(["node", "--check"], input=response_script.text, text=True, capture_output=True)
+            result = subprocess.run(["node", "--check"], input=response_script.text, text=True, encoding="utf-8", capture_output=True)
             check("Served external JavaScript", response_script.status_code == 200 and result.returncode == 0, result.stderr.strip())
             check("Compact CSP header", len(csp.encode()) < 1024)
             print("INFO CSP header bytes:", len(csp.encode()))
