@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -134,6 +135,28 @@ class InvestigatorTests(unittest.TestCase):
 
 
 class LlmKeyTheftTests(unittest.TestCase):
+    def test_startup_uses_only_selected_provider_key(self):
+        from backend.llm_engine import LLMEngine, PROVIDER_KEY_ENV
+        keys = {name: f"secret-for-{provider}" for provider, name in PROVIDER_KEY_ENV.items()}
+        for provider in PROVIDER_KEY_ENV:
+            with self.subTest(provider=provider), patch.dict(
+                os.environ, {**keys, "AIGIS_LLM_PROVIDER": provider}, clear=True
+            ):
+                self.assertEqual(LLMEngine().api_key, f"secret-for-{provider}")
+
+    def test_startup_does_not_fall_back_to_another_provider_key(self):
+        from backend.llm_engine import LLMEngine
+        for provider in ("openai", "heuristic", "ollama", "unknown"):
+            with self.subTest(provider=provider), patch.dict(
+                os.environ, {"AIGIS_LLM_PROVIDER": provider, "GEMINI_API_KEY": "gemini-secret"}, clear=True
+            ):
+                self.assertEqual(LLMEngine().api_key, "")
+
+    def test_startup_normalizes_provider_and_key(self):
+        from backend.llm_engine import LLMEngine
+        with patch.dict(os.environ, {"AIGIS_LLM_PROVIDER": " GROQ ", "GROQ_API_KEY": " key "}, clear=True):
+            self.assertEqual(LLMEngine().api_key, "key")
+
     def test_base_url_must_be_official_host(self):
         from backend.llm_engine import LLMEngine
         eng = LLMEngine()

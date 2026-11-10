@@ -2,14 +2,14 @@
 
 # AIGIS: Adversarial Intelligence for Generative Immunity & Security
 
-**Autonomous Multi-Agent Adversarial Wargaming & Self-Healing Architecture for FinTech Business Logic**
+**Local Multi-Agent Wargaming & Remediation Simulation for FinTech Business Logic**
 
-*Detecting, Exploiting, Diagnosing, and Auto-Patching Sub-5ms Concurrency Race Conditions & Business Logic Flaws in Real-Time*
+*Explore telemetry signals, reproduce business-logic flaws on mock targets, and compare baseline vs. patched behavior with saved evidence.*
 
 <br/>
 
 <p align="center">
-  <a href="https://github.com/Faewon/AIGIS"><img src="https://img.shields.io/badge/AIGIS-v3.0--Enterprise-4f46e5.svg?style=for-the-badge" alt="AIGIS Engine v3.0"/></a>
+  <a href="https://github.com/Faewon/AIGIS"><img src="https://img.shields.io/badge/AIGIS-Local%20Proof%20of%20Concept-4f46e5.svg?style=for-the-badge" alt="AIGIS local proof of concept"/></a>
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI%20Async-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Runtime-Python%203.10%2B-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"/></a>
   <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/Telemetry-1%2C000%2C000%20Events-003B57.svg?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite WAL"/></a>
@@ -22,9 +22,9 @@
 ---
 
 > [!IMPORTANT]
-> **THE 2026 FINTECH CRISIS: BUSINESS LOGIC VULNERABILITIES & SUB-5MS RACE CONDITIONS**
+> **WHY BUSINESS-LOGIC WARGAMING?**
 >
-> High-throughput financial services, digital wallets, and e-commerce platforms lose tens of millions annually not to traditional injection attacks (SQLi, XSS), but to **Time-of-Check to Time-of-Use (TOCTOU) concurrency race conditions**, undocumented **Shadow APIs** exposed in client bundles, and distributed **Sybil bot swarms**.
+> Financial services, digital wallets, and e-commerce platforms need to preserve business invariants under concurrent requests, retries and invalid state transitions. **Time-of-Check to Time-of-Use (TOCTOU) races**, missing ownership checks and payment-flow bypasses are examples that benefit from explicit scenario testing.
 >
 > Static application security testing (SAST) and dynamic web vulnerability scanners (DAST) struggle with these temporal, multi-threaded business logic flaws. AIGIS is a **simulation demo**: a multi-agent arena that runs attacks, patches and retests against an **in-process mock target** and synthetic telemetry, to illustrate the workflow.
 
@@ -93,18 +93,18 @@ flowchart TD
         PolicyStore["Contextual Policies & SLAs<br/>(Flash Sale Schedules & Thresholds)"]
     end
 
-    subgraph Agent_Swarm["5-AGENT AUTONOMOUS SWARM"]
+    subgraph Agent_Swarm["5-ROLE LOCAL SIMULATION WORKFLOW"]
         Sentinel["Agent 1: FinTech Sentinel<br/>(Time-Series Drift & Velocity Derivative)"]
         Investigator["Agent 2: Deep Quant Investigator<br/>(In-Process Read-Only SQL RCA)"]
         RedTeam["Agent 3: Red Adversary & Exploit Fuzzer<br/>(Regex Shadow API Scan & Coroutine Bursts)"]
         BlueTeam["Agent 4: Auto-Remediator (Blue Aegis)<br/>(Reference Patch Templates)"]
-        Arbiter["Agent 5: Compliance Arbiter & Copilot<br/>(Zero-Regression Testing & Canary Work Orders)"]
+        Arbiter["Agent 5: Compliance Arbiter & Copilot<br/>(Mock Regression Checks & Draft Work Orders)"]
     end
 
     subgraph Interface_Layer["TECHNICAL OPERATIONS CONSOLE"]
-        TelemetryGrid["Power BI Technical Operations Grid"]
+        TelemetryGrid["Browser Telemetry Explorer & Dashboard"]
         CopilotChat["SecOps Copilot Q&A & Handoff"]
-        WorkOrderView["Canary Deployment Matrix (5% -> 25% -> 100%)"]
+        WorkOrderView["Canary Plan Preview (5% -> 25% -> 100%)"]
     end
 
     StreamEngine --> Sentinel
@@ -116,7 +116,7 @@ flowchart TD
     Investigator <--> IncidentKB
     Investigator -- "Quantitative RCA Dossier" --> BlueTeam
     BlueTeam -- "Reference Patch" --> Arbiter
-    Arbiter -- "Verified Patch & PR" --> WorkOrderView
+    Arbiter -- "Mock Evidence & Simulated PR Text" --> WorkOrderView
 
     CopilotChat -- "Operator Diagnostic Request" --> Investigator
     Investigator -- "Analysis Telemetry" --> CopilotChat
@@ -202,13 +202,13 @@ When the sampled rows carry an `is_attack` column, `/api/v1/database/classify` r
 
 ## Telemetry Database & Operational Scale
 
-AIGIS can generate a synthetic telemetry dataset of **1,000,000 transaction records**. The CSV and `aigis_telemetry.db` are gitignored, so a fresh clone starts with an empty schema. Generate the data from the UI or via `POST /api/v1/dataset/generate` then `POST /api/v1/database/sync`. The `attack_ratio` parameter is the per-*batch* probability of an attack burst; each burst writes several rows, so the committed metadata shows about 31% attack rows at `attack_ratio=0.035`.
+AIGIS can generate a synthetic telemetry dataset of **1,000,000 transaction records**. The CSV and `aigis_telemetry.db` are gitignored and are not included in a fresh clone. At startup, the server initializes local storage and automatically starts the synthetic stream at 10 TPS; you do not need the million-row dataset for a first demo. To create the larger fixture, use the UI or `POST /api/v1/dataset/generate` then `POST /api/v1/database/sync`. The `attack_ratio` parameter is the per-*batch* probability of an attack burst; each burst writes several rows, so the committed metadata shows about 31% attack rows at `attack_ratio=0.035`.
 
 | Column Name | Type | Description |
 | :--- | :--- | :--- |
 | `event_id` | TEXT | Unique UUID primary key per transaction event |
 | `timestamp` / `epoch_ms` | TEXT / INT | Millisecond-precision event timestamp |
-| `user_id` / `session_id` | TEXT | Cryptographic user and session tracking identifier |
+| `user_id` / `session_id` | TEXT | Synthetic user and session tracking identifiers |
 | `account_age_days` / `kyc_level` | INT / TEXT | Account maturity and KYC tier |
 | `client_ip` / `is_datacenter_proxy` | TEXT / INT | Client IP address and ASN datacenter flag |
 | `tls_ja3_hash` / `http_protocol` | TEXT | Client TLS fingerprint and protocol (`HTTP/1.1`, `HTTP/2`) |
@@ -224,31 +224,37 @@ AIGIS can generate a synthetic telemetry dataset of **1,000,000 transaction reco
 ## Quick Start Guide
 
 ### Prerequisites
-- Python 3.10 or higher
+- Python 3.10 or higher; CI is configured for Python 3.12 and 3.14 on Windows and Ubuntu
 - Git
+- Node.js for extended offline JavaScript checks only (CI uses Node 22); not required to launch the dashboard
 
 ### Installation
 
-```bash
-# 1. Clone the repository
+```powershell
 git clone https://github.com/Faewon/AIGIS.git
 cd AIGIS
+```
 
-# 2. Set up virtual environment
-python -m venv .venv
+**Windows PowerShell** (activation is not required):
 
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# On Linux / macOS:
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe run_server.py
+```
+
+**Linux / macOS:**
+
+```bash
+python3 -m venv .venv
 source .venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+python run_server.py
 ```
 
 ### Launching the Platform
 
-Start the high-throughput asynchronous engine:
+With the virtual environment active (or using its explicit Python path), launch:
 ```bash
 python run_server.py
 ```
@@ -262,12 +268,34 @@ Open the console in your browser:
 http://127.0.0.1:8000
 ```
 
-The server binds to `127.0.0.1` only. Every `/api/*` route requires an `X-AIGIS-Token` header. The token is generated per process (or taken from `AIGIS_API_TOKEN`) and injected into the dashboard page, so the bundled UI works without extra setup. CORS is disabled. See `.env.example` for the supported settings.
+The server binds to `127.0.0.1` only. Every `/api/*` route requires an `X-AIGIS-Token` header. The token is generated per process (or taken from `AIGIS_API_TOKEN`) and injected into the dashboard page, so the bundled UI works without extra setup. CORS is disabled. See [.env.example](.env.example) for supported settings; copying it to `.env` does **not** load it into the process.
+
+### First demo
+
+1. Open the dashboard and inspect the automatically generated synthetic stream.
+2. Run a Wargame scenario: voucher race, account ownership (BOLA/IDOR), negative payment amount, or skipped order-state transition.
+3. Compare baseline and mock-patched results, including legitimate-user regression evidence. A business pass does not imply a latency SLA pass.
+4. Use **Queue benchmark** for a durable run and inspect history/replay. Generated patch and PR text are review artifacts, not deployed changes.
+
+See the [3-minute demo guide](docs/demo.md) for the presentation workflow.
+
+### Configuration and data safety
+
+- **Offline by default:** `AIGIS_LLM_PROVIDER=heuristic` needs no API key. External LLMs are optional and do not turn the mock into a production scanner.
+- **Provider-specific credentials:** startup reads only the selected provider's key (`GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`, `SAMBANOVA_API_KEY`, or `GITHUB_TOKEN`). Switching provider in the UI without entering a replacement key clears the previous key. Ollama uses a loopback endpoint.
+- **Outbound data:** choosing an external LLM can send prompt/context data to that provider. Review its policies and avoid sensitive uploads or prompts; the PII scanner is not a guarantee of complete anonymization.
+- **Local trust boundary:** the dashboard has no user login and supplies the API token to its browser client. This is not multi-user authentication. Do not expose the server through a public proxy or change its bind address for production use.
+- **Persistence:** uploaded datasets, snapshots, incidents and run history may remain on disk. Use authorized, sanitized data and manage local retention; do not commit keys, DSNs or private datasets.
 
 ### Running the tests
 ```bash
 python -m unittest discover -s tests -v
+python -m scratch.check_project
+python -m scratch.check_docs
+python -m pip check
 ```
+
+On Windows without activation, replace `python` with `.\.venv\Scripts\python.exe`.
 
 ### Optional PostgreSQL telemetry
 
@@ -299,11 +327,20 @@ synchronous routes are separate. Expired leases become `INTERRUPTED` or
 manifests and rejects incompatible source versions. See
 [wargame execution and evidence](docs/wargame-improvements.md).
 
-Latest recorded local verification (before this documentation-only update):
-**85 tests discovered, 83 passed, 2 PostgreSQL integration tests skipped**;
-the full Edge browser suite passed. Skips do not verify real PostgreSQL
-connectivity. Re-run tests for the current checkout; see
+Local verification on **2026-11-10**: **88 tests discovered, 86 passed,
+2 PostgreSQL integration tests skipped**; extended offline project checks and
+local documentation-link checks passed. Browser checks were **not rerun** in this
+review; an earlier Edge suite pass is historical evidence only. Skips do not verify real PostgreSQL
+connectivity. Re-run tests for your checkout; see
 [verification commands](docs/postgresql.md#verification).
+
+### Remaining validation and development priorities
+
+- Run the optional integration tests against a disposable PostgreSQL instance; the default offline suite does not verify real database connectivity or TLS.
+- Rerun browser workflows after UI changes; backend tests do not establish browser correctness.
+- Validate detection on independently labeled, authorized data. Synthetic fixtures and the current low-recall stress results do not establish production detection quality.
+- Production adoption would require separately designed authentication/authorization, deployment controls, retention/privacy review and independently reviewed business invariants. These are not delivered by this local proof of concept.
+- The current test environment emits a Starlette/httpx deprecation warning. Tests pass, but dependency compatibility should be reviewed before a future upgrade.
 
 ---
 
@@ -368,7 +405,7 @@ AIGIS/
 |-- backend/
 |   |-- agents/
 |   |   |-- adversarial_trainer.py   # Wargame orchestration engine
-|   |   |-- arbiter.py               # Compliance verification & Git PR generator
+|   |   |-- arbiter.py               # Demo compliance mappings & simulated PR text
 |   |   |-- blue_aegis.py            # Reference patch template generator
 |   |   |-- fintech_sentinel.py      # Time-series drift & velocity derivatives
 |   |   |-- quant_investigator.py    # In-process read-only SQL RCA engine
@@ -384,18 +421,22 @@ AIGIS/
 |   |   |-- store.py                 # Target mock e-commerce & voucher microservice
 |   |-- database.py                  # SQLite WAL connection & Incident KB store
 |   |-- data_simulator.py            # 1M telemetry simulation pipeline
-|   |-- llm_engine.py                # Google Gemini API & heuristic fallback
+|   |-- llm_engine.py                # Optional multi-provider LLM gateway & heuristic fallback
 |   |-- patch_exporter.py            # Multi-target reference patch templates
-|   |-- pii_scanner.py               # Telemetry anonymizer & compliance sanitizer
+|   |-- pii_scanner.py               # Pattern-based PII detection/masking (not exhaustive)
 |   |-- server.py                    # High-throughput FastAPI asynchronous application
 |   |-- stream_engine.py             # Continuous telemetry streaming engine
 |   |-- text_to_sql.py               # Natural language to SQLite query engine
 |   |-- traffic_classifier.py        # 4-vector heuristic classifier
+|   |-- evidence.py                  # Typed analysis & simulation provenance
+|   |-- postgres_source.py           # Optional read-only PostgreSQL snapshots
 |-- tests/
 |   |-- test_security_regressions.py # Regression tests for the security review
 |-- frontend/
 |   |-- index.html                   # Technical Operations Single-Page Application
 |   |-- standalone.css               # Complete technical styling definitions
+|   |-- wargame-verification.js       # Wargame evidence presentation helpers
+|   |-- vendor/                      # Bundled browser dependencies
 |-- docs/
 |   |-- README.md                    # Documentation navigation & reading paths
 |   |-- overview.md                  # Vietnamese executive summary
@@ -403,6 +444,8 @@ AIGIS/
 |   |-- demo.md                      # Demo preparation & presentation workflow
 |   |-- design-system.md             # Brand & dashboard design reference
 |   |-- backend-reliability.md        # Backend implementation & evaluation context
+|   |-- postgresql.md                # Read-only source setup & integration checks
+|   |-- wargame-improvements.md       # Queue, replay & mock benchmark limitations
 |   `-- reports/                     # Indexed historical checks & resolved findings
 |-- LICENSE                          # MIT License
 |-- README.md                        # Master technical documentation
@@ -423,6 +466,8 @@ AIGIS/
 | [3-minute demo](docs/demo.md) | Preparation, presentation steps, and measured-result narration |
 | [Design system](docs/design-system.md) | Brand identity and dashboard visual guidance |
 | [Backend reliability](docs/backend-reliability.md) | Implementation details, classifier stress results, and local benchmarks |
+| [PostgreSQL sources](docs/postgresql.md) | Optional read-only profiles, bounded snapshots, and integration tests |
+| [Wargame verification](docs/wargame-improvements.md) | Durable jobs, manifest replay, control ablations, and evidence limits |
 | [Review & check history](docs/reports/README.md) | Historical checks, resolved findings, and reproduction commands |
 
 ---

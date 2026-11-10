@@ -17,6 +17,15 @@ import httpx
 from typing import Dict, Any, List, Optional
 
 ALLOWED_PROVIDERS = {"gemini", "groq", "openrouter", "openai", "cerebras", "sambanova", "github", "ollama", "heuristic"}
+PROVIDER_KEY_ENV = {
+    "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "cerebras": "CEREBRAS_API_KEY",
+    "sambanova": "SAMBANOVA_API_KEY",
+    "github": "GITHUB_TOKEN",
+}
 DEFAULT_BASE_URLS = {
     "groq": "https://api.groq.com/openai/v1",
     "openrouter": "https://openrouter.ai/api/v1",
@@ -82,7 +91,9 @@ class LLMEngine:
         # Đọc cấu hình từ môi trường hoặc khởi tạo mặc định
         env_provider = (os.getenv("AIGIS_LLM_PROVIDER", "heuristic") or "heuristic").strip().lower()
         self.provider = env_provider if env_provider in ALLOWED_PROVIDERS else "heuristic"
-        self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+        # Never send another provider's credential to the selected provider.
+        key_env = PROVIDER_KEY_ENV.get(self.provider)
+        self.api_key = os.getenv(key_env, "").strip() if key_env else ""
         self.last_call_error: Optional[str] = None
         self.last_call_latency_ms: Optional[float] = None
         self.last_call_success: bool = False
